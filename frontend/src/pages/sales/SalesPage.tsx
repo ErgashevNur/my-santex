@@ -9,7 +9,7 @@ import Select from '../../components/ui/Select'
 import Badge from '../../components/ui/Badge'
 import { formatCurrency, formatDate, cn } from '../../lib/utils'
 import { Search, Trash2, ShoppingCart, History, Printer, X, ChevronLeft } from 'lucide-react'
-type View = 'pos' | 'history'
+import { printViaAgent } from '../../lib/printViaAgent'type View = 'pos' | 'history'
 type MobileTab = 'search' | 'cart'
 
 const paymentLabels: Record<string, string> = {
@@ -58,7 +58,7 @@ export default function SalesPage() {
   const createSale = useMutation({
     mutationFn: salesApi.create,
     onSuccess: (sale) => {
-      salesApi.reprint(sale.id)
+      printViaAgent(sale)
       qc.invalidateQueries({ queryKey: ['sales'] })
       qc.invalidateQueries({ queryKey: ['products'] })
       setCart([])
@@ -67,7 +67,10 @@ export default function SalesPage() {
     },
   })
 
-  const reprint = useMutation({ mutationFn: salesApi.reprint })
+  const reprint = useMutation({
+    mutationFn: (saleId: string) => salesApi.getOne(saleId),
+    onSuccess: (sale) => printViaAgent(sale),
+  })
 
   // ── Cart helpers ───────────────────────────────────────────────────────────
   const addToCart = (product: any) => {
