@@ -9,7 +9,6 @@ import Select from '../../components/ui/Select'
 import Badge from '../../components/ui/Badge'
 import { formatCurrency, formatDate, cn } from '../../lib/utils'
 import { Search, Trash2, ShoppingCart, History, Printer, X, ChevronLeft } from 'lucide-react'
-import { printViaAgent } from '../../lib/printViaAgent'
 type View = 'pos' | 'history'
 type MobileTab = 'search' | 'cart'
 
@@ -59,7 +58,7 @@ export default function SalesPage() {
   const createSale = useMutation({
     mutationFn: salesApi.create,
     onSuccess: (sale) => {
-      printViaAgent(sale)
+      salesApi.reprint(sale.id)
       qc.invalidateQueries({ queryKey: ['sales'] })
       qc.invalidateQueries({ queryKey: ['products'] })
       setCart([])
@@ -68,10 +67,7 @@ export default function SalesPage() {
     },
   })
 
-  const reprint = useMutation({
-    mutationFn: (saleId: string) => salesApi.getOne(saleId),
-    onSuccess: (sale) => printViaAgent(sale),
-  })
+  const reprint = useMutation({ mutationFn: salesApi.reprint })
 
   // ── Cart helpers ───────────────────────────────────────────────────────────
   const addToCart = (product: any) => {
