@@ -9,7 +9,7 @@ import Select from '../../components/ui/Select'
 import Badge from '../../components/ui/Badge'
 import { formatCurrency, formatDate, cn } from '../../lib/utils'
 import { Search, Trash2, ShoppingCart, History, Printer, X, ChevronLeft } from 'lucide-react'
-
+import { printViaAgent } from '../../lib/printViaAgent'
 type View = 'pos' | 'history'
 type MobileTab = 'search' | 'cart'
 
@@ -33,8 +33,6 @@ export default function SalesPage() {
   const [cart, setCart] = useState<CartItem[]>([])
   const [productSearch, setProductSearch] = useState('')
   const [paymentMethod, setPaymentMethod] = useState('CASH')
-  const [customerName, setCustomerName] = useState('')
-  const [discount, setDiscount] = useState('0')
 
   // History filters
   const [dateFilter, setDateFilter] = useState('')
@@ -45,7 +43,6 @@ export default function SalesPage() {
   const { data: products = [] } = useQuery({
     queryKey: ['products-search', productSearch],
     queryFn: () => productsApi.getAll({ search: productSearch || undefined }),
-    enabled: productSearch.length > 0,
   })
 
   const { data: sales = [], isLoading: historyLoading } = useQuery({
@@ -61,18 +58,20 @@ export default function SalesPage() {
   // ── Mutations ──────────────────────────────────────────────────────────────
   const createSale = useMutation({
     mutationFn: salesApi.create,
-    onSuccess: () => {
+    onSuccess: (sale) => {
+      printViaAgent(sale)
       qc.invalidateQueries({ queryKey: ['sales'] })
       qc.invalidateQueries({ queryKey: ['products'] })
       setCart([])
-      setCustomerName('')
-      setDiscount('0')
       setProductSearch('')
       setMobileTab('search')
     },
   })
 
-  const reprint = useMutation({ mutationFn: salesApi.reprint })
+  const reprint = useMutation({
+    mutationFn: (saleId: string) => salesApi.getOne(saleId),
+    onSuccess: (sale) => printViaAgent(sale),
+  })
 
   // ── Cart helpers ───────────────────────────────────────────────────────────
   const addToCart = (product: any) => {
@@ -92,16 +91,13 @@ export default function SalesPage() {
 
   const clearFilters = () => { setDateFilter(''); setReceiptFilter(''); setPaymentFilter('') }
 
-  const subtotal = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
-  const total = subtotal - Number(discount || 0)
+  const total = cart.reduce((s, i) => s + i.unitPrice * i.quantity, 0)
 
   const handleCheckout = () => {
     if (!cart.length || total <= 0) return
     createSale.mutate({
       items: cart.map(i => ({ productId: i.productId, quantity: i.quantity, unitPrice: i.unitPrice })),
       paymentMethod,
-      customerName: customerName || undefined,
-      discountAmount: Number(discount || 0),
     })
   }
 
@@ -268,42 +264,74 @@ export default function SalesPage() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
-        {/* LEFT — Tovar qidirish */}
+        {/* LEFT — Tovarlar */}
         <Card className={cn('flex flex-col overflow-hidden p-4', mobileTab !== 'search' && 'hidden lg:flex')}>
-          <p className="text-sm font-semibold text-slate-700 mb-3">Tovar qidirish</p>
+          <div className="flex items-center justify-between mb-3">
+            <p className="text-sm font-semibold text-slate-700">Tovarlar</p>
+            <span className="text-xs text-slate-400">{(products as any[]).length} ta</span>
+          </div>
           <Input
-            placeholder="Tovar nomini yozing..."
+            placeholder="Qidirish..."
             value={productSearch}
             onChange={e => setProductSearch(e.target.value)}
             leftIcon={<Search size={15} />}
             autoFocus
           />
           <div className="flex-1 overflow-y-auto mt-3 space-y-1.5 min-h-0">
-            {!productSearch && (
-              <div className="flex flex-col items-center justify-center h-full text-slate-300 gap-2">
-                <Search size={36} strokeWidth={1.5} />
-                <p className="text-sm">Tovar nomini kiriting</p>
-              </div>
-            )}
-            {productSearch && products.length === 0 && (
+            {products.length === 0 && (
               <p className="text-center py-8 text-sm text-slate-400">Tovar topilmadi</p>
             )}
-            {(products as any[]).map(p => (
-              <button
-                key={p.id}
-                onClick={() => addToCart(p)}
-                className="w-full flex items-center justify-between px-3 py-2.5 hover:bg-blue-50 text-left rounded-lg border border-slate-100 hover:border-blue-200 transition-colors group"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium text-slate-800 truncate">{p.name}</p>
-                  <p className="text-xs text-slate-400 mt-0.5">
-                    Qoldiq: <span className={Number(p.stock) <= 0 ? 'text-red-500' : 'text-slate-500'}>{Number(p.stock)}</span>
-                    {p.barcode && <span className="ml-2">· {p.barcode}</span>}
-                  </p>
-                </div>
-                <span className="text-sm font-bold text-blue-600 ml-3 shrink-0">{formatCurrency(p.sellPrice)}</span>
-              </button>
-            ))}
+            {(products as any[]).map(p => {
+              const stock = Number(p.stock)
+              const outOfStock = stock <= 0
+              const lowStock = stock > 0 && stock <= 5
+              return (
+                <button
+                  key={p.id}
+                  onClick={() => !outOfStock && addToCart(p)}
+                  disabled={outOfStock}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3 py-2.5 text-left rounded-lg border transition-colors',
+                    outOfStock
+                      ? 'bg-slate-50 border-slate-100 opacity-60 cursor-not-allowed'
+                      : lowStock
+                        ? 'bg-orange-50 border-orange-200 hover:bg-orange-100 hover:border-orange-300'
+                        : 'bg-white border-slate-100 hover:bg-blue-50 hover:border-blue-200',
+                  )}
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className={cn(
+                      'text-sm font-medium truncate',
+                      outOfStock ? 'text-slate-400' : 'text-slate-800',
+                    )}>
+                      {p.name}
+                    </p>
+                    <div className="flex items-center gap-2 mt-1">
+                      {outOfStock ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
+                          Tugagan
+                        </span>
+                      ) : lowStock ? (
+                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">
+                          ⚠ Kam: {stock} ta
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-400">{stock} ta</span>
+                      )}
+                      {p.barcode && (
+                        <span className="text-xs text-slate-300">· {p.barcode}</span>
+                      )}
+                    </div>
+                  </div>
+                  <span className={cn(
+                    'text-sm font-bold ml-3 shrink-0',
+                    outOfStock ? 'text-slate-400' : 'text-blue-600',
+                  )}>
+                    {formatCurrency(p.sellPrice)}
+                  </span>
+                </button>
+              )
+            })}
           </div>
         </Card>
 
@@ -365,22 +393,6 @@ export default function SalesPage() {
 
           {/* Checkout section */}
           <div className="border-t border-slate-200 pt-3 space-y-2.5 shrink-0">
-            <div className="grid grid-cols-2 gap-2">
-              <Input
-                label="Mijoz ismi"
-                value={customerName}
-                onChange={e => setCustomerName(e.target.value)}
-                placeholder="Ixtiyoriy"
-              />
-              <Input
-                label="Chegirma (sum)"
-                type="number"
-                value={discount}
-                onChange={e => setDiscount(e.target.value)}
-                min="0"
-              />
-            </div>
-
             <Select
               label="To'lov turi"
               value={paymentMethod}
@@ -388,19 +400,9 @@ export default function SalesPage() {
               options={Object.entries(paymentLabels).map(([v, l]) => ({ value: v, label: l }))}
             />
 
-            {/* Totals */}
-            <div className="bg-slate-50 rounded-xl p-3 space-y-1.5">
-              <div className="flex justify-between text-sm text-slate-600">
-                <span>Jami:</span>
-                <span>{formatCurrency(subtotal)}</span>
-              </div>
-              {Number(discount) > 0 && (
-                <div className="flex justify-between text-sm text-red-500">
-                  <span>Chegirma:</span>
-                  <span>−{formatCurrency(Number(discount))}</span>
-                </div>
-              )}
-              <div className="flex justify-between font-bold text-base text-slate-800 pt-1.5 border-t border-slate-200">
+            {/* Total */}
+            <div className="bg-slate-50 rounded-xl p-3">
+              <div className="flex justify-between font-bold text-base text-slate-800">
                 <span>To'lash:</span>
                 <span className="text-emerald-600">{formatCurrency(total)}</span>
               </div>

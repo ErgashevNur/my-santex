@@ -53,12 +53,12 @@ export function printReceipt(sale: any) {
   }
   .center { text-align: center; }
   .bold { font-weight: bold; }
-  .large { font-size: 16px; line-height: 1.4; }
-  .sep { border-top: 1px dashed #000; margin: 5px 0; }
-  .row { display: flex; justify-content: space-between; margin: 2px 0; }
-  .item-name { font-weight: bold; margin-bottom: 2px; }
-  .total-row { font-size: 14px; font-weight: bold; margin: 3px 0; }
-  .thanks { font-size: 13px; margin-top: 4px; }
+  .large { font-size: 15px; line-height: 1.4; }
+  .sep { border-top: 1px dashed #000; margin: 4px 0; }
+  .row { display: flex; justify-content: space-between; margin: 2px 0; white-space: nowrap; }
+  .item-name { font-weight: bold; margin-bottom: 2px; word-break: break-word; }
+  .total-row { font-size: 13px; font-weight: bold; margin: 3px 0; }
+  .thanks { font-size: 12px; margin-top: 4px; }
   @media print {
     @page { size: 80mm auto; margin: 2mm; }
     body { width: 100%; }
@@ -97,5 +97,10 @@ ${discount > 0 ? `<div class="row"><span>Chegirma:</span><span>-${money(discount
   setTimeout(() => {
     win.print();
     win.close();
+    cutPaper();
   }, 250);
+}
+
+export function cutPaper(): void {
+  fetch('http://localhost:5555/cut', { method: 'POST' }).catch(() => {});
 }
