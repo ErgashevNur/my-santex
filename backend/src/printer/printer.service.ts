@@ -225,21 +225,24 @@ export class PrinterService {
     const ESC = '\x1B';
     const GS = '\x1D';
 
-    const bold1 = `${ESC}\x45\x01`;
-    const bold0 = `${ESC}\x45\x00`;
-    const dblH = `${ESC}\x21\x10`;
+    const bold1  = `${ESC}\x45\x01`;
+    const bold0  = `${ESC}\x45\x00`;
+    const dblH   = `${ESC}\x21\x10`;
     const normal = `${ESC}\x21\x00`;
     const alignL = `${ESC}\x61\x00`;
     const alignC = `${ESC}\x61\x01`;
-    const LF = '\n';
-    const sep = '='.repeat(W);
+    const LF   = '\n';
+    const SEP  = '='.repeat(W);
     const dash = '-'.repeat(W);
 
-    const money = (n: number | string) => {
-      const v = typeof n === 'string' ? parseFloat(n) : n;
-      return (
-        String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' sum'
-      );
+    // "45000" → "45,000"
+    const fmt = (n: number) =>
+      String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+    // Chap + o'ng (to'ldirib W ga yetkazadi)
+    const rowLR = (left: string, right: string) => {
+      const gap = W - left.length - right.length;
+      return left + ' '.repeat(Math.max(1, gap)) + right;
     };
 
     const pad2 = (n: number) => String(n).padStart(2, '0');
@@ -249,69 +252,64 @@ export class PrinterService {
 
     let t = `${ESC}\x40`;
 
-    // ── HEADER ──────────────────────────────
-    t += alignC + bold1 + dblH;
-    t += d.storeName + LF;
-    t += normal + bold0;
+    // ═══ SARLAVHA ════════════════════════════════
+    t += alignC + SEP + LF;
+    t += bold1 + dblH + d.storeName + normal + bold0 + LF;
     if (d.storeAddress) t += d.storeAddress + LF;
-    if (d.storePhone) t += 'Tel: ' + d.storePhone + LF;
-    t += alignL + sep + LF;
+    if (d.storePhone) t += d.storePhone + LF;
+    t += alignL + SEP + LF;
 
-    // ── CHEK MA'LUMOTLARI ───────────────────
-    const receiptId = `#${String(d.receiptNo).padStart(4, '0')}`;
-    t += `Chek   : ${bold1}${receiptId}${bold0}` + LF;
-    t += `Sana   : ${dateStr} ${timeStr}` + LF;
+    // ─── CHEK MA'LUMOTLARI ───────────────────────
+    const receiptId = `#${String(d.receiptNo).padStart(6, '0')}`;
+    t += `Sana   : ${dateStr}  ${timeStr}` + LF;
     t += `Kassir : ${d.cashierName}` + LF;
+    t += `Chek   : ${bold1}${receiptId}${bold0}` + LF;
     if (d.customerName) t += `Mijoz  : ${d.customerName}` + LF;
 
-    // ── TOVARLAR (har biri alohida qatorda) ─
-    d.items.forEach((item, idx) => {
-      t += sep + LF;
+    // ─── TOVARLAR JADVALI ────────────────────────
+    t += dash + LF;
+    const NW = 24;  // nom ustuni
+    const QW = 6;   // miqdor ustuni
+    const PW = W - NW - QW;  // narx ustuni (o'ngga)
+    t += 'Mahsulot'.padEnd(NW) + 'Miqdor'.padEnd(QW) + 'Narx'.padStart(PW) + LF;
+    t += dash + LF;
 
-      // Tovar nomi — bold
-      const prefix = `${idx + 1}. `;
-      const maxLen = W - prefix.length;
+    d.items.forEach((item) => {
       const nm =
-        item.name.length > maxLen
-          ? item.name.slice(0, maxLen - 2) + '..'
+        item.name.length > NW - 1
+          ? item.name.slice(0, NW - 3) + '..'
           : item.name;
-      t += bold1 + prefix + nm + bold0 + LF;
-
-      // Miqdor x narx = jami (o'ngda jami summa)
-      const left = `   ${item.quantity} x ${money(item.unitPrice)}`;
-      const right = money(item.totalPrice);
-      const gap = W - left.length - right.length;
-      if (gap >= 1) {
-        t += left + ' '.repeat(gap) + right + LF;
-      } else {
-        t += left + LF;
-        t += '   = '.padEnd(W - right.length) + right + LF;
-      }
+      const qtyStr   = String(item.quantity);
+      const priceStr = fmt(item.totalPrice);
+      t += nm.padEnd(NW) + qtyStr.padEnd(QW) + priceStr.padStart(PW) + LF;
+      // Alt qator: birlik narxi
+      t += `  @ ${fmt(item.unitPrice)} sum` + LF;
     });
 
-    // ── JAMI ───────────────────────────────
-    t += sep + LF;
-    const MW = 16;
-    t += 'Jami:'.padEnd(W - MW) + money(d.subtotal).padStart(MW) + LF;
+    // ─── JAMI ────────────────────────────────────
+    t += dash + LF;
+    t += rowLR("Yig'indi:", fmt(d.subtotal)) + LF;
     if (d.discount > 0) {
-      t +=
-        'Chegirma:'.padEnd(W - MW) +
-        ('-' + money(d.discount)).padStart(MW) +
-        LF;
+      const pct =
+        d.subtotal > 0
+          ? ` (${Math.round((d.discount / d.subtotal) * 100)}%)`
+          : '';
+      t += rowLR(`Chegirma${pct}:`, `-${fmt(d.discount)}`) + LF;
       t += dash + LF;
     }
+    t += bold1 + rowLR("TO'LOV:", `${fmt(d.total)} sum`) + bold0 + LF;
+    t += SEP + LF;
 
-    // TO'LASH — bold
-    t += bold1;
-    t += "TO'LASH:".padEnd(W - MW) + money(d.total).padStart(MW) + LF;
-    t += bold0 + sep + LF;
+    // ─── TO'LOV TURI ─────────────────────────────
+    const payLabel = PAYMENT_LABELS[d.paymentMethod] || d.paymentMethod;
+    t += `To'lov : ${bold1}${payLabel.toUpperCase()}${bold0}` + LF;
+    t += SEP + LF;
 
-    // ── TO'LOV TURI ────────────────────────
-    t +=
-      `To'lov : ${bold1}${PAYMENT_LABELS[d.paymentMethod] || d.paymentMethod}${bold0}` +
-      LF;
-    t += sep + LF;
-    t += alignC + bold1 + 'Xarid uchun rahmat!' + bold0 + LF;
+    // ─── FOOTER ──────────────────────────────────
+    t += alignC;
+    t += bold1 + 'Xarid uchun rahmat!' + bold0 + LF;
+    t += 'Qaytib kelishingizni kutib qolamiz!' + LF;
+    t += SEP + LF;
     t += LF + LF + LF;
     t += `${GS}\x56\x41\x05`;
 
