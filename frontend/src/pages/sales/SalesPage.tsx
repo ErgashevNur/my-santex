@@ -9,7 +9,9 @@ import Select from '../../components/ui/Select'
 import Badge from '../../components/ui/Badge'
 import { formatCurrency, formatDate, cn } from '../../lib/utils'
 import { Search, Trash2, ShoppingCart, History, Printer, X, ChevronLeft } from 'lucide-react'
-import { printViaAgent } from '../../lib/printViaAgent'type View = 'pos' | 'history'
+import { printViaAgent } from '../../lib/printViaAgent'
+
+type View = 'pos' | 'history'
 type MobileTab = 'search' | 'cart'
 
 const paymentLabels: Record<string, string> = {

@@ -29,7 +29,7 @@ export default function UsersPage() {
 
   const { data: users = [], isLoading } = useQuery({
     queryKey: ['users'],
-    queryFn: usersApi.getAll,
+    queryFn: () => usersApi.getAll(),
   })
 
   const { data: allUsers = [], isLoading: pinsLoading } = useQuery({
