@@ -291,21 +291,12 @@ export class PrinterService {
 
     // ─── JAMI ────────────────────────────────────
     t += SEP + LF;
-    t += rowLR("Yig'indi:", `${fmt(d.subtotal)}`) + LF;
-    if (d.discount > 0) {
-      const pct =
-        d.subtotal > 0
-          ? ` (${Math.round((d.discount / d.subtotal) * 100)}%)`
-          : '';
-      t += rowLR(`Chegirma${pct}:`, `-${fmt(d.discount)}`) + LF;
-    }
-    t += dash + LF;
-    t += bold1 + rowLR("TO'LOV:", `${fmt(d.total)} sum`) + bold0 + LF;
+    t += bold1 + rowLR('Jami:', `${fmt(d.total)} sum`) + bold0 + LF;
     t += SEP + LF;
 
     // ─── TO'LOV TURI ─────────────────────────────
     const payLabel = PAYMENT_LABELS[d.paymentMethod] || d.paymentMethod;
-    t += `To'lov : ${bold1}${payLabel.toUpperCase()}${bold0}` + LF;
+    t += `To'lov turi : ${bold1}${payLabel.toUpperCase()}${bold0}` + LF;
     t += SEP + LF;
 
     // ─── FOOTER ──────────────────────────────────
