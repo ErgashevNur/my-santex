@@ -1,311 +1,378 @@
-const express = require('express');
-const cors = require('cors');
-const fs = require('fs');
-const fsp = require('fs/promises');
+#!/usr/bin/env node
+/**
+ * My Santex — Print Agent (cross-OS)
+ * Zero-dependency. Faqat Node.js (>= 14) kerak. npm install SHART EMAS.
+ *
+ * Ishga tushirish:
+ *   PRINTER_IP=192.168.1.38 node server.js     # TAVSIYA: driversiz, hamma OS
+ *   PRINTER_NAME=XP-80 node server.js          # Windows spooler / macOS CUPS
+ *   node server.js                             # Linux USB /dev/usb/lp0
+ *
+ * Endpointlar (eski kontrakt o'zgarmagan — frontend printViaAgent.ts shundayligicha ishlaydi):
+ *   GET  /status   -> joriy rejim va transport zanjiri
+ *   POST /print    -> sotuv JSON -> chek chiqaradi
+ *   POST /cut      -> faqat qog'ozni kesadi
+ */
+
+'use strict';
+
+const http = require('http');
 const net = require('net');
-const { exec } = require('child_process');
+const fs = require('fs');
 const os = require('os');
 const path = require('path');
+const { execFile } = require('child_process');
 
-const app = express();
-const PORT = process.env.PRINT_AGENT_PORT || 5555;
-const WIDTH = parseInt(process.env.PRINTER_WIDTH || '48', 10);
-const IS_WINDOWS = os.platform() === 'win32';
-const PRINTER_IP = process.env.PRINTER_IP || '';
+// ---------- Sozlamalar (ENV) ----------
+const HOST = process.env.HOST || '127.0.0.1';
+const PORT = parseInt(process.env.PORT || '5555', 10);
+
+const PRINTER_IP = (process.env.PRINTER_IP || '').trim();
 const PRINTER_PORT_NET = parseInt(process.env.PRINTER_PORT || '9100', 10);
+const PRINTER_NAME = process.env.PRINTER_NAME || 'XP-80';
+const PRINTER_USB_PATH = process.env.PRINTER_USB_PATH || '/dev/usb/lp0';
+const PLATFORM = process.platform; // 'win32' | 'darwin' | 'linux'
 
-const USB_CANDIDATES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/usb/lp3'];
+const WIDTH = 48; // 80mm, A shrift => 48 belgi
 
-const PAYMENT_LABELS = {
-  CASH: 'Naqd pul',
-  CARD: 'Plastik karta',
-  TRANSFER: "Bank o'tkazma",
-  INSTALLMENT: "Muddatli to'lov",
-};
+// =====================================================================
+//  1) CHEK QURISH — transportdan mustaqil (ESC/POS bufer qaytaradi)
+// =====================================================================
+const ESC = 0x1b, GS = 0x1d, LF = 0x0a;
 
-app.use(cors());
-app.use(express.json());
+function sanitize(s) {
+  // Uzbek maxsus belgilari (o', g') va "aqlli" qo'shtirnoqlarni latin1 uchun ASCII'ga
+  return String(s == null ? '' : s)
+    .replace(/[ʻʼ‘’]/g, "'")
+    .replace(/[“”]/g, '"');
+}
 
-// ── Status ───────────────────────────────────────────────────────────────────
-app.get('/status', (req, res) => {
-  if (PRINTER_IP) {
-    return res.json({ ok: true, mode: 'network', host: PRINTER_IP, port: PRINTER_PORT_NET });
+function money(n) {
+  const v = Math.round(Number(n) || 0).toString();
+  return v.replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' sum';
+}
+
+function pad4(n) {
+  return String(n == null ? 0 : n).padStart(4, '0');
+}
+
+function paymentLabel(m) {
+  const map = {
+    CASH: 'Naqd pul', CARD: 'Karta', TRANSFER: "O'tkazma",
+    DEBT: 'Qarz', MIXED: 'Aralash',
+  };
+  return map[String(m || '').toUpperCase()] || String(m || '-');
+}
+
+function fmtDate(iso) {
+  const d = iso ? new Date(iso) : new Date();
+  if (isNaN(d.getTime())) return String(iso || '');
+  const p = (x) => String(x).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ` +
+         `${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+// chap + o'ng ustun, 48 belgiga tekislangan
+function row(left, right) {
+  left = sanitize(left);
+  right = sanitize(right);
+  let gap = WIDTH - left.length - right.length;
+  if (gap < 1) {
+    left = left.slice(0, Math.max(0, WIDTH - right.length - 1));
+    gap = Math.max(1, WIDTH - left.length - right.length);
   }
-  if (IS_WINDOWS) {
-    const printerName = process.env.PRINTER_NAME || 'XP-80';
-    return res.json({ ok: true, mode: 'windows', printer: printerName });
-  }
-  const devices = {};
-  for (const d of USB_CANDIDATES) {
-    devices[d] = fs.existsSync(d) ? 'TOPILDI' : "YO'Q";
-  }
-  const found = Object.entries(devices).find(([, v]) => v === 'TOPILDI')?.[0] || null;
-  res.json({ ok: true, mode: 'linux-usb', printer: found ? 'ULANGAN' : "ULANMAGAN", device: found, devices });
-});
+  return left + ' '.repeat(gap) + right;
+}
 
-// ── Cut only ─────────────────────────────────────────────────────────────────
-app.post('/cut', async (req, res) => {
-  const GS = '\x1D';
-  const buf = Buffer.from('\n\n\n' + `${GS}\x56\x41\x00`, 'latin1');
-  if (PRINTER_IP) return sendNetwork(buf, res);
-  if (IS_WINDOWS) return sendWindows(buf, res);
-  return sendLinux(buf, res);
-});
+function buildReceipt(sale) {
+  sale = sale || {};
+  const store = sale.store || {};
+  const user = sale.user || {};
+  const items = Array.isArray(sale.items) ? sale.items : [];
+  const sep = '='.repeat(WIDTH);
 
-// ── Print ────────────────────────────────────────────────────────────────────
-app.post('/print', async (req, res) => {
-  const sale = req.body;
-  if (!sale || !sale.items) {
-    return res.status(400).json({ ok: false, error: "Sale data yo'q" });
-  }
-  const buf = buildReceipt(sale);
-  if (PRINTER_IP) return sendNetwork(buf, res);
-  if (IS_WINDOWS) return sendWindows(buf, res);
-  return sendLinux(buf, res);
-});
+  const out = [];
+  const cmd = (...b) => out.push(Buffer.from(b));
+  const ln = (s) => out.push(Buffer.from(sanitize(s) + '\n', 'latin1'));
 
-// ── Windows: PowerShell .ps1 fayl orqali RAW ESC/POS ────────────────────────
-function sendWindows(buf, res) {
-  const printerName = process.env.PRINTER_NAME || 'XP-80';
-  const ts = Date.now();
-  const prnFile = path.join(os.tmpdir(), `chek_${ts}.prn`);
-  const ps1File = path.join(os.tmpdir(), `chek_${ts}.ps1`);
-  const prnEsc  = prnFile.replace(/\\/g, '\\\\');
+  cmd(ESC, 0x40);                 // reset
+  cmd(ESC, 0x61, 1);              // markaz
+  cmd(ESC, 0x21, 0x10);           // ikki baravar baland shrift
+  ln(store.name || 'MY SANTEX');
+  cmd(ESC, 0x21, 0x00);           // normal shrift
+  if (store.address) ln(store.address);
+  if (store.phone) ln('Tel: ' + store.phone);
 
-  fs.writeFile(prnFile, buf, (writeErr) => {
-    if (writeErr) {
-      console.error('[print-agent] Temp fayl xato:', writeErr.message);
-      return res.status(500).json({ ok: false, error: writeErr.message });
-    }
+  cmd(ESC, 0x61, 0);              // chapga tekislash
+  ln(sep);
+  ln(row('Chek :', '#' + pad4(sale.receiptNo)));
+  ln(row('Sana :', fmtDate(sale.createdAt)));
+  if (user.name) ln(row('Kassir :', user.name));
+  ln(sep);
 
-    const psScript = `$ErrorActionPreference = "Stop"
-try {
-  # Printer mavjudligini tekshir
-  $p = Get-WmiObject Win32_Printer -Filter "Name='${printerName}'" -ErrorAction SilentlyContinue
-  if ($null -eq $p) {
-    $all = (Get-WmiObject Win32_Printer | ForEach-Object { $_.Name }) -join " | "
-    throw "Printer '${printerName}' topilmadi. Windows da mavjud: $all"
-  }
+  items.forEach((it, i) => {
+    const name = (it.product && it.product.name) || it.name || 'Tovar';
+    const qty = Number(it.quantity) || 0;
+    const price = Number(it.unitPrice) || 0;
+    const total = Number(it.totalPrice != null ? it.totalPrice : qty * price);
+    ln(`${i + 1}. ${name}`);
+    ln(row(`   ${qty} x ${money(price)}`, money(total)));
+  });
+  ln(sep);
 
-  $bytes = [System.IO.File]::ReadAllBytes("${prnEsc}")
+  cmd(ESC, 0x21, 0x08);           // qalin (emphasized)
+  ln(row('Jami:', money(sale.totalAmount)));
+  cmd(ESC, 0x21, 0x00);
+  ln(sep);
+  ln(row("To'lov :", paymentLabel(sale.paymentMethod)));
+  ln(sep);
 
-  Add-Type -TypeDefinition @'
+  cmd(ESC, 0x61, 1);              // markaz
+  ln('Xarid uchun rahmat!');
+  cmd(ESC, 0x61, 0);
+
+  cmd(LF, LF, LF);                // qog'oz chiqarish
+  cmd(GS, 0x56, 0x41, 0x00);      // qisman kesish
+  return Buffer.concat(out);
+}
+
+const CUT_BUF = Buffer.from([GS, 0x56, 0x41, 0x00]);
+
+// =====================================================================
+//  2) TRANSPORTLAR — har biri Promise qaytaradi
+// =====================================================================
+
+// (a) Network — TCP RAW 9100. Universal, driversiz.
+function tNetwork(buf) {
+  return new Promise((resolve, reject) => {
+    const sock = new net.Socket();
+    let done = false;
+    const fail = (m) => {
+      if (!done) { done = true; sock.destroy(); reject(new Error('network: ' + m)); }
+    };
+    sock.setTimeout(5000);
+    sock.on('error', (e) => fail(e.message));
+    sock.on('timeout', () => fail('timeout'));
+    sock.connect(PRINTER_PORT_NET, PRINTER_IP, () => {
+      sock.write(buf, () => sock.end(() => {
+        if (!done) {
+          done = true;
+          resolve({ via: 'network', host: PRINTER_IP, port: PRINTER_PORT_NET });
+        }
+      }));
+    });
+  });
+}
+
+// (b) Linux USB — to'g'ridan-to'g'ri qurilma fayli.
+function tUsbLinux(buf) {
+  return new Promise((resolve, reject) => {
+    fs.writeFile(PRINTER_USB_PATH, buf, (err) => {
+      if (err) reject(new Error('usb: ' + err.message));
+      else resolve({ via: 'usb', path: PRINTER_USB_PATH });
+    });
+  });
+}
+
+// (c) CUPS raw — macOS va Linux (lp -o raw). "Raw" navbat kerak.
+function tCups(buf) {
+  return new Promise((resolve, reject) => {
+    const tmp = path.join(os.tmpdir(), `santex-${Date.now()}-${process.pid}.bin`);
+    fs.writeFile(tmp, buf, (err) => {
+      if (err) return reject(new Error('cups: ' + err.message));
+      execFile('lp', ['-d', PRINTER_NAME, '-o', 'raw', tmp], (e, _o, stderr) => {
+        fs.unlink(tmp, () => {});
+        if (e) reject(new Error('cups: ' + ((stderr || e.message) + '').trim()));
+        else resolve({ via: 'cups', name: PRINTER_NAME });
+      });
+    });
+  });
+}
+
+// (d) Windows — RAW spooler (winspool WritePrinter), temp .ps1 fayl orqali (-File bilan).
+function tWindows(buf) {
+  return new Promise((resolve, reject) => {
+    const stamp = `${Date.now()}-${process.pid}`;
+    const binFile = path.join(os.tmpdir(), `santex-${stamp}.bin`);
+    const ps1File = path.join(os.tmpdir(), `santex-${stamp}.ps1`);
+    fs.writeFile(binFile, buf, (e1) => {
+      if (e1) return reject(new Error('windows: ' + e1.message));
+      fs.writeFile(ps1File, winRawScript(), (e2) => {
+        if (e2) { fs.unlink(binFile, () => {}); return reject(new Error('windows: ' + e2.message)); }
+        const env = Object.assign({}, process.env, {
+          SANTEX_FILE: binFile, SANTEX_PRINTER: PRINTER_NAME,
+        });
+        const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ps1File];
+        execFile('powershell.exe', args, { env, windowsHide: true }, (e, _o, stderr) => {
+          fs.unlink(binFile, () => {});
+          fs.unlink(ps1File, () => {});
+          if (e) reject(new Error('windows: ' + ((stderr || e.message) + '').trim()));
+          else resolve({ via: 'windows-spooler', name: PRINTER_NAME });
+        });
+      });
+    });
+  });
+}
+
+// PowerShell skript .ps1 faylga yoziladi va -File bilan ishga tushiriladi.
+// DIQQAT: here-string yopuvchisi '@ ALOHIDA qatorda, chap chetda turishi shart.
+function winRawScript() {
+  return `$ErrorActionPreference = 'Stop'
+$src = @'
 using System;
 using System.Runtime.InteropServices;
-public class RawPrint {
-  [DllImport("winspool.drv",CharSet=CharSet.Auto,SetLastError=true)]
+public class SantexRaw {
+  [StructLayout(LayoutKind.Sequential, CharSet=CharSet.Unicode)]
+  public class DOCINFO {
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDocName;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pOutputFile;
+    [MarshalAs(UnmanagedType.LPWStr)] public string pDataType;
+  }
+  [DllImport("winspool.Drv", EntryPoint="OpenPrinterW", SetLastError=true, CharSet=CharSet.Unicode)]
   public static extern bool OpenPrinter(string n, out IntPtr h, IntPtr d);
-  [DllImport("winspool.drv",CharSet=CharSet.Auto,SetLastError=true)]
+  [DllImport("winspool.Drv", EntryPoint="ClosePrinter", SetLastError=true)]
   public static extern bool ClosePrinter(IntPtr h);
-  [DllImport("winspool.drv",CharSet=CharSet.Auto,SetLastError=true)]
-  public static extern int StartDocPrinter(IntPtr h, int lev, ref DOCINFO di);
-  [DllImport("winspool.drv",CharSet=CharSet.Auto,SetLastError=true)]
+  [DllImport("winspool.Drv", EntryPoint="StartDocPrinterW", SetLastError=true, CharSet=CharSet.Unicode)]
+  public static extern bool StartDocPrinter(IntPtr h, int l, [In, MarshalAs(UnmanagedType.LPStruct)] DOCINFO di);
+  [DllImport("winspool.Drv", EntryPoint="EndDocPrinter", SetLastError=true)]
   public static extern bool EndDocPrinter(IntPtr h);
-  [DllImport("winspool.drv",CharSet=CharSet.Auto,SetLastError=true)]
+  [DllImport("winspool.Drv", EntryPoint="StartPagePrinter", SetLastError=true)]
   public static extern bool StartPagePrinter(IntPtr h);
-  [DllImport("winspool.drv",CharSet=CharSet.Auto,SetLastError=true)]
+  [DllImport("winspool.Drv", EntryPoint="EndPagePrinter", SetLastError=true)]
   public static extern bool EndPagePrinter(IntPtr h);
-  [DllImport("winspool.drv",CharSet=CharSet.Auto,SetLastError=true)]
-  public static extern bool WritePrinter(IntPtr h,byte[] b,int c,out int w);
-  [StructLayout(LayoutKind.Sequential,CharSet=CharSet.Auto)]
-  public struct DOCINFO {
-    [MarshalAs(UnmanagedType.LPStr)] public string pDocName;
-    [MarshalAs(UnmanagedType.LPStr)] public string pOutputFile;
-    [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
-  }
-}
-'@ -ErrorAction SilentlyContinue
-
-  $h = [IntPtr]::Zero
-  $opened = [RawPrint]::OpenPrinter("${printerName}", [ref]$h, [IntPtr]::Zero)
-  if (-not $opened -or $h -eq [IntPtr]::Zero) {
-    $win32err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
-    throw "OpenPrinter muvaffaqiyatsiz. Win32 xato kodi: $win32err"
-  }
-
-  $di = New-Object RawPrint+DOCINFO
-  $di.pDocName  = "Chek"
-  $di.pDataType = "RAW"
-  [RawPrint]::StartDocPrinter($h, 1, [ref]$di) | Out-Null
-  [RawPrint]::StartPagePrinter($h) | Out-Null
-  $w = 0
-  [RawPrint]::WritePrinter($h, $bytes, $bytes.Length, [ref]$w) | Out-Null
-  [RawPrint]::EndPagePrinter($h) | Out-Null
-  [RawPrint]::EndDocPrinter($h) | Out-Null
-  [RawPrint]::ClosePrinter($h) | Out-Null
-  Write-Output "OK:$w"
-} catch {
-  Write-Error $_.Exception.Message
-  exit 1
-}
-`;
-
-    fs.writeFile(ps1File, psScript, (psErr) => {
-      if (psErr) {
-        fs.unlink(prnFile, () => {});
-        return res.status(500).json({ ok: false, error: psErr.message });
-      }
-
-      exec(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${ps1File}"`,
-        { timeout: 10000 },
-        (err, stdout, stderr) => {
-          fs.unlink(prnFile, () => {});
-          fs.unlink(ps1File, () => {});
-          if (err || !stdout.includes('OK:')) {
-            const msg = (stderr || err?.message || 'Noma\'lum xato').trim();
-            console.error('[print-agent] Windows print xato:\n', msg);
-            return res.status(500).json({ ok: false, error: msg });
-          }
-          console.log(`[print-agent] Chek yuborildi → ${printerName}`);
-          res.json({ ok: true, printer: printerName });
-        }
-      );
-    });
-  });
-}
-
-// ── Network: TCP socket orqali (Linux ham, Windows ham) ──────────────────────
-function sendNetwork(buf, res) {
-  const client = new net.Socket();
-  const timer = setTimeout(() => {
-    client.destroy();
-    res.status(500).json({ ok: false, error: `Printer ulanmadi: ${PRINTER_IP}:${PRINTER_PORT_NET}` });
-  }, 5000);
-
-  client.connect(PRINTER_PORT_NET, PRINTER_IP, () => {
-    client.write(buf, () => {
-      clearTimeout(timer);
-      client.destroy();
-      console.log(`[print-agent] Chek yuborildi → ${PRINTER_IP}:${PRINTER_PORT_NET}`);
-      res.json({ ok: true, host: PRINTER_IP, port: PRINTER_PORT_NET });
-    });
-  });
-  client.on('error', (err) => {
-    clearTimeout(timer);
-    res.status(500).json({ ok: false, error: `Network printer xato: ${err.message}` });
-  });
-}
-
-// ── Linux: to'g'ridan-to'g'ri USB device ga ──────────────────────────────────
-async function sendLinux(buf, res) {
-  const configured = process.env.PRINTER_USB_PATH || '';
-  const candidates = configured ? [configured] : USB_CANDIDATES;
-  for (const devicePath of candidates) {
+  [DllImport("winspool.Drv", EntryPoint="WritePrinter", SetLastError=true)]
+  public static extern bool WritePrinter(IntPtr h, byte[] b, int n, out int w);
+  public static void Send(string printer, byte[] data) {
+    IntPtr h;
+    if (!OpenPrinter(printer, out h, IntPtr.Zero)) throw new Exception("OpenPrinter muvaffaqiyatsiz: " + printer);
     try {
-      await fsp.writeFile(devicePath, buf);
-      console.log(`[print-agent] Chek yuborildi → ${devicePath}`);
-      return res.json({ ok: true, device: devicePath });
-    } catch (err) {
-      console.log(`[print-agent] ${devicePath}: ${err.message}`);
-    }
+      DOCINFO di = new DOCINFO();
+      di.pDocName = "My Santex Chek"; di.pDataType = "RAW";
+      if (!StartDocPrinter(h, 1, di)) throw new Exception("StartDocPrinter xato");
+      try {
+        if (!StartPagePrinter(h)) throw new Exception("StartPagePrinter xato");
+        int w; if (!WritePrinter(h, data, data.Length, out w)) throw new Exception("WritePrinter xato");
+        EndPagePrinter(h);
+      } finally { EndDocPrinter(h); }
+    } finally { ClosePrinter(h); }
   }
-  res.status(500).json({ ok: false, error: `USB printer topilmadi: ${candidates.join(', ')}` });
+}
+'@
+Add-Type -TypeDefinition $src -Language CSharp
+$bytes = [System.IO.File]::ReadAllBytes($env:SANTEX_FILE)
+[SantexRaw]::Send($env:SANTEX_PRINTER, $bytes)
+`;
 }
 
-// ── ESC/POS receipt (kesish komandasi bilan) ──────────────────────────────────
-function buildReceipt(d) {
-  const W   = WIDTH;
-  const ESC = '\x1B';
-  const GS  = '\x1D';
+// =====================================================================
+//  3) SELECTOR + FALLBACK — OS va ENV asosida zanjir
+// =====================================================================
+function safeExists(p) { try { return fs.existsSync(p); } catch (_) { return false; } }
 
-  const bold1  = `${ESC}\x45\x01`;
-  const bold0  = `${ESC}\x45\x00`;
-  const dblH   = `${ESC}\x21\x10`;
-  const normal = `${ESC}\x21\x00`;
-  const alignL = `${ESC}\x61\x00`;
-  const alignC = `${ESC}\x61\x01`;
-  const LF   = '\n';
-  const sep  = '='.repeat(W);
-  const dash = '-'.repeat(W);
+function buildChain() {
+  const chain = [];
+  if (PRINTER_IP) chain.push({ name: 'network', fn: tNetwork });
+  if (PLATFORM === 'win32') {
+    chain.push({ name: 'windows', fn: tWindows });
+  } else if (PLATFORM === 'darwin') {
+    chain.push({ name: 'cups', fn: tCups });
+  } else { // linux va boshqalar
+    if (safeExists(PRINTER_USB_PATH)) chain.push({ name: 'usb', fn: tUsbLinux });
+    chain.push({ name: 'cups', fn: tCups });
+  }
+  return chain;
+}
 
-  const money = (n) => {
-    const v = typeof n === 'string' ? parseFloat(n) : n;
-    return String(Math.round(v)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' sum';
+async function printBuffer(buf) {
+  const chain = buildChain();
+  if (chain.length === 0) {
+    throw new Error("Transport yo'q. PRINTER_IP yoki PRINTER_NAME bering.");
+  }
+  const errs = [];
+  for (const t of chain) {
+    try {
+      const r = await t.fn(buf);
+      console.log(`[print] OK -> ${t.name}`);
+      return r;
+    } catch (e) {
+      console.warn(`[print] ${t.name} muvaffaqiyatsiz: ${e.message}`);
+      errs.push(e.message);
+    }
+  }
+  throw new Error('Barcha transportlar muvaffaqiyatsiz -> ' + errs.join(' | '));
+}
+
+function statusInfo() {
+  const chain = buildChain().map((t) => t.name);
+  return {
+    ok: true,
+    platform: PLATFORM,
+    mode: chain[0] || null,
+    chain,
+    printerIp: PRINTER_IP || null,
+    printerPort: PRINTER_IP ? PRINTER_PORT_NET : null,
+    printerName: PRINTER_NAME,
+    usbPath: PLATFORM === 'linux' ? PRINTER_USB_PATH : null,
   };
-
-  const pad2 = (n) => String(n).padStart(2, '0');
-  const dt = new Date(d.createdAt);
-  const dateStr = `${pad2(dt.getDate())}.${pad2(dt.getMonth() + 1)}.${dt.getFullYear()}`;
-  const timeStr = `${pad2(dt.getHours())}:${pad2(dt.getMinutes())}`;
-
-  const store    = d.store   || {};
-  const user     = d.user    || {};
-  const items    = d.items   || [];
-  const subtotal = items.reduce((s, i) => s + Number(i.totalPrice), 0);
-  const discount = Number(d.discountAmount || 0);
-  const receiptId = `#${String(d.receiptNo).padStart(4, '0')}`;
-
-  let t = `${ESC}\x40`;
-
-  t += alignC + bold1 + dblH;
-  t += (store.name || "Do'kon") + LF;
-  t += normal + bold0;
-  if (store.address) t += store.address + LF;
-  if (store.phone)   t += 'Tel: ' + store.phone + LF;
-  t += alignL + sep + LF;
-
-  t += `Chek   : ${bold1}${receiptId}${bold0}` + LF;
-  t += `Sana   : ${dateStr} ${timeStr}` + LF;
-  t += `Kassir : ${user.name || '—'}` + LF;
-  if (d.customerName) t += `Mijoz  : ${d.customerName}` + LF;
-
-  items.forEach((item, idx) => {
-    t += sep + LF;
-    const prefix = `${idx + 1}. `;
-    const maxLen = W - prefix.length;
-    const nm = item.product?.name || item.name || '';
-    const name = nm.length > maxLen ? nm.slice(0, maxLen - 2) + '..' : nm;
-    t += bold1 + prefix + name + bold0 + LF;
-    const left  = `   ${Number(item.quantity)} x ${money(Number(item.unitPrice))}`;
-    const right = money(Number(item.totalPrice));
-    const gap   = W - left.length - right.length;
-    if (gap >= 1) {
-      t += left + ' '.repeat(gap) + right + LF;
-    } else {
-      t += left + LF;
-      t += '   = '.padEnd(W - right.length) + right + LF;
-    }
-  });
-
-  t += sep + LF;
-  const MW = 16;
-  t += 'Jami:'.padEnd(W - MW) + money(subtotal).padStart(MW) + LF;
-  if (discount > 0) {
-    t += 'Chegirma:'.padEnd(W - MW) + ('-' + money(discount)).padStart(MW) + LF;
-    t += dash + LF;
-  }
-  t += bold1;
-  t += "TO'LASH:".padEnd(W - MW) + money(Number(d.totalAmount)).padStart(MW) + LF;
-  t += bold0 + sep + LF;
-
-  t += `To'lov : ${bold1}${PAYMENT_LABELS[d.paymentMethod] || d.paymentMethod}${bold0}` + LF;
-  t += sep + LF;
-  t += alignC + bold1 + 'Xarid uchun rahmat!' + bold0 + LF;
-  t += LF + LF + LF;
-
-  // Qog'oz kesish: GS V 65 0 = partial cut (ko'pchilik termallarda ishlaydi)
-  t += `${GS}\x56\x41\x00`;
-
-  return Buffer.from(t, 'latin1');
 }
 
-// ── Start ─────────────────────────────────────────────────────────────────────
-app.listen(PORT, '127.0.0.1', () => {
-  console.log(`\n╔══════════════════════════════════════╗`);
-  console.log(`║   My Santex — Print Agent            ║`);
-  console.log(`╚══════════════════════════════════════╝`);
-  console.log(`Platforma : ${IS_WINDOWS ? 'Windows' : 'Linux'}`);
-  console.log(`Manzil    : http://localhost:${PORT}`);
-  if (IS_WINDOWS) {
-    const name = process.env.PRINTER_NAME || 'XP-80';
-    console.log(`Printer   : ${name}`);
-    console.log(`\nBoshqa printer nomi bo'lsa:`);
-    console.log(`  set PRINTER_NAME=PrinterNomi && node server.js\n`);
-  } else {
-    console.log('USB qurilmalar:');
-    for (const d of USB_CANDIDATES) {
-      console.log(`  ${d}: ${fs.existsSync(d) ? '✓ TOPILDI' : "YO'Q"}`);
-    }
-    console.log('');
+// =====================================================================
+//  4) HTTP SERVER (0 dependency) + CORS
+// =====================================================================
+const CORS = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET,POST,OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+function send(res, code, obj) {
+  res.writeHead(code, Object.assign({ 'Content-Type': 'application/json' }, CORS));
+  res.end(JSON.stringify(obj));
+}
+
+const server = http.createServer((req, res) => {
+  if (req.method === 'OPTIONS') { res.writeHead(204, CORS); return res.end(); }
+
+  const url = (req.url || '/').split('?')[0];
+
+  if (req.method === 'GET' && url === '/status') {
+    return send(res, 200, statusInfo());
   }
+
+  if (req.method === 'POST' && url === '/cut') {
+    return printBuffer(CUT_BUF)
+      .then((r) => send(res, 200, Object.assign({ ok: true }, r)))
+      .catch((e) => send(res, 500, { ok: false, error: e.message }));
+  }
+
+  if (req.method === 'POST' && url === '/print') {
+    let body = '';
+    req.on('data', (c) => { body += c; if (body.length > 2e6) req.destroy(); });
+    req.on('end', () => {
+      let sale;
+      try { sale = JSON.parse(body || '{}'); }
+      catch (_) { return send(res, 400, { ok: false, error: 'JSON xato' }); }
+      let buf;
+      try { buf = buildReceipt(sale); }
+      catch (e) { return send(res, 400, { ok: false, error: 'Chek qurishda xato: ' + e.message }); }
+      printBuffer(buf)
+        .then((r) => send(res, 200, Object.assign({ ok: true }, r)))
+        .catch((e) => send(res, 500, { ok: false, error: e.message }));
+    });
+    return;
+  }
+
+  send(res, 404, { ok: false, error: 'Not found' });
+});
+
+server.listen(PORT, HOST, () => {
+  const s = statusInfo();
+  console.log('--------------------------------------------------');
+  console.log(` My Santex Print Agent -> http://${HOST}:${PORT}`);
+  console.log(` Platform : ${s.platform}`);
+  console.log(` Transport: ${s.chain.join('  ->  ')}`);
+  if (s.printerIp) console.log(` Network  : ${s.printerIp}:${s.printerPort}`);
+  if (s.platform === 'win32' || s.platform === 'darwin') console.log(` Printer  : ${s.printerName}`);
+  if (s.platform !== 'win32' && s.platform !== 'darwin') console.log(` USB      : ${s.usbPath}`);
+  console.log('--------------------------------------------------');
 });
