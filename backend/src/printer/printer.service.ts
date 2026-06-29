@@ -233,7 +233,6 @@ export class PrinterService {
     const alignC = `${ESC}\x61\x01`;
     const LF     = '\n';
     const SEP    = '='.repeat(W);
-    const dash   = '-'.repeat(W);
     const dotted = '- '.repeat(Math.ceil(W / 2)).slice(0, W);
 
     // "45000" → "45,000"
