@@ -7,7 +7,7 @@ interface User {
   email?: string | null
   role: 'SUPER_ADMIN' | 'ROP' | 'SALES_MANAGER'
   storeId: string | null
-  store?: { id: string; name: string; subscriptionStatus: string } | null
+  store?: { id: string; name: string; subscriptionStatus: string; storeType: 'SALES' | 'DEBT' } | null
 }
 
 interface AuthState {

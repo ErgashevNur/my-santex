@@ -1,11 +1,12 @@
 import { NavLink } from 'react-router-dom'
 import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../store/auth.store'
-import { LayoutDashboard, Package, ShoppingCart, Users, Store, Bell } from 'lucide-react'
+import { LayoutDashboard, Package, ShoppingCart, Users, Store, Bell, Wallet } from 'lucide-react'
 
 export default function BottomNav() {
   const { user } = useAuthStore()
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isDebtStore = user?.store?.storeType === 'DEBT'
 
   const storeLinks = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Asosiy' },
@@ -16,13 +17,17 @@ export default function BottomNav() {
       : []),
   ]
 
+  const debtLinks = [
+    { to: '/debtors', icon: Wallet, label: 'Qarzdorlar' },
+  ]
+
   const adminLinks = [
     { to: '/admin', icon: LayoutDashboard, label: 'Asosiy' },
     { to: '/admin/stores', icon: Store, label: "Do'konlar" },
     { to: '/admin/notifications', icon: Bell, label: 'Bildirishnoma' },
   ]
 
-  const links = isSuperAdmin ? adminLinks : storeLinks
+  const links = isSuperAdmin ? adminLinks : isDebtStore ? debtLinks : storeLinks
 
   return (
     <nav className="lg:hidden fixed bottom-0 inset-x-0 z-30 bg-white border-t border-slate-200 flex">

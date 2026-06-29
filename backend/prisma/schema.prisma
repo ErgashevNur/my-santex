@@ -20,6 +20,7 @@ model Store {
   isActive           Boolean               @default(true)
   createdAt          DateTime              @default(now())
   updatedAt          DateTime              @updatedAt
+  storeType          StoreType             @default(SALES)
   categories         Category[]
   products           Product[]
   sales              Sale[]
@@ -184,6 +185,11 @@ model DebtTransaction {
   @@index([debtorId])
   @@index([storeId])
   @@map("debt_transactions")
+}
+
+enum StoreType {
+  SALES
+  DEBT
 }
 
 enum DebtTxType {

@@ -3,7 +3,7 @@ import { cn } from '../../lib/utils'
 import { useAuthStore } from '../../store/auth.store'
 import {
   LayoutDashboard, Package, ShoppingCart, Users, Store,
-  LogOut, ChevronLeft, ChevronRight, Bell,
+  LogOut, ChevronLeft, ChevronRight, Bell, Wallet,
 } from 'lucide-react'
 
 interface SidebarProps {
@@ -14,6 +14,7 @@ interface SidebarProps {
 export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { user, logout } = useAuthStore()
   const isSuperAdmin = user?.role === 'SUPER_ADMIN'
+  const isDebtStore = user?.store?.storeType === 'DEBT'
 
   const storeLinks = [
     { to: '/dashboard', icon: LayoutDashboard, label: 'Dashboard' },
@@ -22,13 +23,17 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     ...(user?.role !== 'SALES_MANAGER' ? [{ to: '/users', icon: Users, label: 'Xodimlar' }] : []),
   ]
 
+  const debtLinks = [
+    { to: '/debtors', icon: Wallet, label: 'Qarzdorlar' },
+  ]
+
   const adminLinks = [
     { to: '/admin', icon: LayoutDashboard, label: 'Dashboard' },
     { to: '/admin/stores', icon: Store, label: "Do'konlar" },
     { to: '/admin/notifications', icon: Bell, label: 'Bildirishnomalar' },
   ]
 
-  const links = isSuperAdmin ? adminLinks : storeLinks
+  const links = isSuperAdmin ? adminLinks : isDebtStore ? debtLinks : storeLinks
 
   return (
     <aside

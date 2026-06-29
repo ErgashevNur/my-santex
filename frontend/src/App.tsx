@@ -14,12 +14,20 @@ import UsersPage from './pages/users/UsersPage'
 import AdminDashboardPage from './pages/admin/AdminDashboardPage'
 import AdminStoresPage from './pages/admin/AdminStoresPage'
 import AdminNotificationsPage from './pages/admin/AdminNotificationsPage'
+import DebtorsPage from './pages/debtors/DebtorsPage'
+import DebtorDetailPage from './pages/debtors/DebtorDetailPage'
 
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { retry: 1, staleTime: 30000 },
   },
 })
+
+function StoreRedirect() {
+  const { user } = useAuthStore()
+  if (user?.store?.storeType === 'DEBT') return <Navigate to="/debtors" replace />
+  return <Navigate to="/dashboard" replace />
+}
 
 function AppContent() {
   const { loadUser, logout } = useAuthStore()
@@ -47,7 +55,7 @@ function AppContent() {
             </ProtectedRoute>
           }
         >
-          <Route index element={<Navigate to="/dashboard" replace />} />
+          <Route index element={<StoreRedirect />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="sales" element={<SalesPage />} />
@@ -56,6 +64,8 @@ function AppContent() {
               <UsersPage />
             </ProtectedRoute>
           } />
+          <Route path="debtors" element={<DebtorsPage />} />
+          <Route path="debtors/:id" element={<DebtorDetailPage />} />
         </Route>
 
         {/* Admin routes */}
