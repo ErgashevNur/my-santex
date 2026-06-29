@@ -69,7 +69,7 @@ export class DebtorsService {
     const debtor = await this.findOne(id, storeId);
     if (Number(debtor.totalDebt) < dto.amount) {
       throw new BadRequestException(
-        `To'lov qarz miqdoridan oshib ketmoqda (qarz: ${debtor.totalDebt})`,
+        `To'lov qarz miqdoridan oshib ketmoqda (qarz: ${Number(debtor.totalDebt)})`,
       );
     }
     return this.prisma.$transaction([
