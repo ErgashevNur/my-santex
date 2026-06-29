@@ -87,52 +87,84 @@ function row(left, right) {
 function buildReceipt(sale) {
   sale = sale || {};
   const store = sale.store || {};
-  const user = sale.user || {};
+  const user  = sale.user  || {};
   const items = Array.isArray(sale.items) ? sale.items : [];
-  const sep = '='.repeat(WIDTH);
+  const SEP    = '='.repeat(WIDTH);
+  const DOTTED = '- '.repeat(Math.ceil(WIDTH / 2)).slice(0, WIDTH);
+
+  // "45000" → "45,000"
+  const fmt = (n) =>
+    String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
   const out = [];
   const cmd = (...b) => out.push(Buffer.from(b));
-  const ln = (s) => out.push(Buffer.from(sanitize(s) + '\n', 'latin1'));
+  const ln  = (s)    => out.push(Buffer.from(sanitize(s) + '\n', 'latin1'));
 
-  cmd(ESC, 0x40);                 // reset
-  cmd(ESC, 0x61, 1);              // markaz
-  cmd(ESC, 0x21, 0x10);           // ikki baravar baland shrift
+  // ═══ SARLAVHA ════════════════════════════════
+  cmd(ESC, 0x40);           // reset
+  cmd(ESC, 0x61, 1);        // markaz
+  ln(SEP);
+  cmd(ESC, 0x21, 0x10);     // ikki baravar baland + qalin
   ln(store.name || 'MY SANTEX');
-  cmd(ESC, 0x21, 0x00);           // normal shrift
+  cmd(ESC, 0x21, 0x00);     // normal
   if (store.address) ln(store.address);
-  if (store.phone) ln('Tel: ' + store.phone);
+  if (store.phone)   ln(store.phone);
+  cmd(ESC, 0x61, 0);        // chapga
+  ln(SEP);
 
-  cmd(ESC, 0x61, 0);              // chapga tekislash
-  ln(sep);
-  ln(row('Chek :', '#' + pad4(sale.receiptNo)));
-  ln(row('Sana :', fmtDate(sale.createdAt)));
-  if (user.name) ln(row('Kassir :', user.name));
-  ln(sep);
+  // ─── CHEK MA'LUMOTLARI ───────────────────────
+  const receiptId = '#' + String(sale.receiptNo || 0).padStart(6, '0');
+  ln(`Sana   : ${fmtDate(sale.createdAt)}`);
+  if (user.name) ln(`Kassir : ${user.name}`);
+  ln(`Chek   : ${receiptId}`);
+  ln(SEP);
 
+  // ─── MAHSULOTLAR — nuqtali chiziq bilan ajratilgan ─
   items.forEach((it, i) => {
-    const name = (it.product && it.product.name) || it.name || 'Tovar';
-    const qty = Number(it.quantity) || 0;
+    const name  = sanitize((it.product && it.product.name) || it.name || 'Tovar');
+    const qty   = Number(it.quantity)  || 0;
     const price = Number(it.unitPrice) || 0;
     const total = Number(it.totalPrice != null ? it.totalPrice : qty * price);
-    ln(`${i + 1}. ${name}`);
-    ln(row(`   ${qty} x ${money(price)}`, money(total)));
+
+    const priceStr = fmt(total) + ' sum';
+    const prefix   = ` ${i + 1}. `;
+    const maxNm    = WIDTH - prefix.length - priceStr.length - 1;
+    const nm       = name.length > maxNm ? name.slice(0, maxNm - 2) + '..' : name;
+
+    // Qator 1: bold nom + jami narx
+    cmd(ESC, 0x21, 0x08);   // qalin
+    ln(row(prefix + nm, priceStr));
+    cmd(ESC, 0x21, 0x00);   // normal
+
+    // Qator 2: miqdor × birlik narxi
+    ln(`    ${fmt(qty)} x ${fmt(price)} sum`);
+
+    // Mahsulotlar orasida nuqtali chiziq (oxirgisidan keyin yo'q)
+    if (i < items.length - 1) ln(DOTTED);
   });
-  ln(sep);
 
-  cmd(ESC, 0x21, 0x08);           // qalin (emphasized)
-  ln(row('Jami:', money(sale.totalAmount)));
+  // ─── JAMI ────────────────────────────────────
+  ln(SEP);
+  cmd(ESC, 0x21, 0x08);     // qalin
+  ln(row('Jami:', fmt(sale.totalAmount) + ' sum'));
   cmd(ESC, 0x21, 0x00);
-  ln(sep);
-  ln(row("To'lov :", paymentLabel(sale.paymentMethod)));
-  ln(sep);
+  ln(SEP);
 
-  cmd(ESC, 0x61, 1);              // markaz
+  // ─── TO'LOV TURI ─────────────────────────────
+  ln(`To'lov turi : ${paymentLabel(sale.paymentMethod).toUpperCase()}`);
+  ln(SEP);
+
+  // ─── FOOTER ──────────────────────────────────
+  cmd(ESC, 0x61, 1);        // markaz
+  cmd(ESC, 0x21, 0x08);     // qalin
   ln('Xarid uchun rahmat!');
+  cmd(ESC, 0x21, 0x00);
+  ln("Qaytib kelishingizni kutib qolamiz!");
+  ln(SEP);
   cmd(ESC, 0x61, 0);
 
-  cmd(LF, LF, LF);                // qog'oz chiqarish
-  cmd(GS, 0x56, 0x41, 0x00);      // qisman kesish
+  cmd(LF, LF, LF);          // qog'oz chiqarish
+  cmd(GS, 0x56, 0x41, 0x00); // qisman kesish
   return Buffer.concat(out);
 }
 
