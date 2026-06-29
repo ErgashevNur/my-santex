@@ -150,7 +150,7 @@ function tNetwork(buf) {
     const fail = (m) => {
       if (!done) { done = true; sock.destroy(); reject(new Error('network: ' + m)); }
     };
-    sock.setTimeout(5000);
+    sock.setTimeout(3000);
     sock.on('error', (e) => fail(e.message));
     sock.on('timeout', () => fail('timeout'));
     sock.connect(PRINTER_PORT_NET, PRINTER_IP, () => {
@@ -203,7 +203,7 @@ function tWindows(buf) {
           SANTEX_FILE: binFile, SANTEX_PRINTER: PRINTER_NAME,
         });
         const args = ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-File', ps1File];
-        execFile('powershell.exe', args, { env, windowsHide: true }, (e, _o, stderr) => {
+        execFile('powershell.exe', args, { env, windowsHide: true, timeout: 30000 }, (e, _o, stderr) => {
           fs.unlink(binFile, () => {});
           fs.unlink(ps1File, () => {});
           if (e) reject(new Error('windows: ' + ((stderr || e.message) + '').trim()));
@@ -359,6 +359,29 @@ const server = http.createServer((req, res) => {
         .then((r) => send(res, 200, Object.assign({ ok: true }, r)))
         .catch((e) => send(res, 500, { ok: false, error: e.message }));
     });
+    return;
+  }
+
+  // Windows: mavjud printerlar ro'yxati (PRINTER_NAME aniqlash uchun)
+  if (req.method === 'GET' && url === '/printers') {
+    if (PLATFORM !== 'win32') {
+      return send(res, 200, { printers: [], note: 'Faqat Windows uchun' });
+    }
+    const cmd = 'Get-Printer | Select-Object Name,PrinterStatus,PortName | ConvertTo-Json -Compress';
+    execFile('powershell.exe',
+      ['-NoProfile', '-NonInteractive', '-ExecutionPolicy', 'Bypass', '-Command', cmd],
+      { timeout: 10000, windowsHide: true },
+      (e, stdout, stderr) => {
+        if (e) return send(res, 500, { ok: false, error: (stderr || e.message).trim() });
+        try {
+          let parsed = JSON.parse(stdout || '[]');
+          if (!Array.isArray(parsed)) parsed = [parsed];
+          send(res, 200, { ok: true, current: PRINTER_NAME, printers: parsed });
+        } catch (_) {
+          send(res, 500, { ok: false, error: 'Parse error', raw: stdout.slice(0, 500) });
+        }
+      }
+    );
     return;
   }
 

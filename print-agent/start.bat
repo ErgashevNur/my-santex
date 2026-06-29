@@ -3,7 +3,9 @@ title My Santex - Print Agent
 cd /d "%~dp0"
 
 echo.
-echo  My Santex Print Agent ishga tushmoqda...
+echo  ================================================
+echo   My Santex Print Agent
+echo  ================================================
 echo.
 
 where node >nul 2>&1
@@ -14,17 +16,45 @@ if %errorlevel% neq 0 (
   exit /b 1
 )
 
-if not exist node_modules (
-  echo  Kutubxonalar o'rnatilmoqda...
-  npm install
-)
+REM ---- Windowsdagi printerlar ro'yxati ----
+echo  Kompyuterga ulangan printerlar:
+powershell -NoProfile -NonInteractive -Command "Get-Printer | ForEach-Object { Write-Host ('    ' + $_.Name) }" 2>nul
+echo.
 
-set PRINTER_IP=192.168.1.38
+REM ================================================================
+REM  SOZLAMALAR — ehtiyojga qarab o'zgartiring:
+REM
+REM  1) Printer USB kabel bilan ulangan bo'lsa:
+REM     - PRINTER_IP ni bo'sh qoldiring
+REM     - PRINTER_NAME ni yuqoridagi ro'yxatdan aniq nusxa ko'chiring
+REM
+REM  2) Printer tarmoq orqali ulangan bo'lsa (Wi-Fi yoki kabel):
+REM     - PRINTER_IP ga printer IP manzilini kiriting
+REM     - PRINTER_NAME ni bo'sh qoldirishingiz mumkin
+REM ================================================================
+
+set PRINTER_IP=
 set PRINTER_PORT=9100
+set PRINTER_NAME=XP-80T
 
-echo  Printer: %PRINTER_IP%:%PRINTER_PORT% (network)
-echo  Manzil : http://localhost:5555
-echo  To'xtatish uchun: Ctrl+C
+REM ================================================================
+
+echo  Sozlamalar:
+if not "%PRINTER_IP%"=="" (
+  echo   Rejim   : Tarmoq ^(TCP^)
+  echo   IP      : %PRINTER_IP%:%PRINTER_PORT%
+) else (
+  echo   Rejim   : Windows spooler ^(USB^)
+  echo   Printer : %PRINTER_NAME%
+  echo.
+  echo   DIQQAT: PRINTER_NAME yuqoridagi ro'yxat bilan mos bo'lishi shart!
+  echo   Mos kelmasa start.bat ichidagi PRINTER_NAME ni o'zgartiring.
+)
+echo.
+echo   Manzil  : http://localhost:5555
+echo   Printerlar ro'yxati: http://localhost:5555/printers
+echo.
+echo  To'xtatish uchun Ctrl+C bosing
 echo.
 
 node server.js
