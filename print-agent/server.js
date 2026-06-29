@@ -57,20 +57,21 @@ app.post('/print', async (req, res) => {
   return sendLinux(buf, res);
 });
 
-// ── Windows: PowerShell P/Invoke orqali RAW ESC/POS ─────────────────────────
+// ── Windows: PowerShell .ps1 fayl orqali RAW ESC/POS ────────────────────────
 function sendWindows(buf, res) {
   const printerName = process.env.PRINTER_NAME || 'XP-80';
-  const tmpFile = path.join(os.tmpdir(), `chek_${Date.now()}.prn`).replace(/\\/g, '\\\\');
+  const ts = Date.now();
+  const prnFile = path.join(os.tmpdir(), `chek_${ts}.prn`);
+  const ps1File = path.join(os.tmpdir(), `chek_${ts}.ps1`);
+  const prnEsc  = prnFile.replace(/\\/g, '\\\\');
 
-  fs.writeFile(tmpFile.replace(/\\\\/g, '\\'), buf, (writeErr) => {
+  fs.writeFile(prnFile, buf, (writeErr) => {
     if (writeErr) {
       console.error('[print-agent] Temp fayl xato:', writeErr.message);
       return res.status(500).json({ ok: false, error: writeErr.message });
     }
 
-    // Windows Spooler API orqali RAW bytes yuborish (driver formatlamaydi)
-    const ps = `
-$bytes = [System.IO.File]::ReadAllBytes("${tmpFile}")
+    const psScript = `$bytes = [System.IO.File]::ReadAllBytes("${prnEsc}")
 Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
@@ -112,19 +113,27 @@ $w=0
 Write-Output "OK:$w"
 `;
 
-    exec(`powershell -NoProfile -NonInteractive -Command "${ps.replace(/"/g, '\\"').replace(/\n/g, ' ')}"`,
-      { timeout: 8000 },
-      (err, stdout, stderr) => {
-        fs.unlink(tmpFile.replace(/\\\\/g, '\\'), () => {});
-        if (err || !stdout.includes('OK:')) {
-          const msg = stderr || err?.message || 'Noma\'lum xato';
-          console.error('[print-agent] Windows print xato:', msg);
-          return res.status(500).json({ ok: false, error: `Printer topilmadi: "${printerName}". PRINTER_NAME ni tekshiring.` });
-        }
-        console.log(`[print-agent] Chek yuborildi → ${printerName}`);
-        res.json({ ok: true, printer: printerName });
+    fs.writeFile(ps1File, psScript, (psErr) => {
+      if (psErr) {
+        fs.unlink(prnFile, () => {});
+        return res.status(500).json({ ok: false, error: psErr.message });
       }
-    );
+
+      exec(`powershell -NoProfile -NonInteractive -ExecutionPolicy Bypass -File "${ps1File}"`,
+        { timeout: 10000 },
+        (err, stdout, stderr) => {
+          fs.unlink(prnFile, () => {});
+          fs.unlink(ps1File, () => {});
+          if (err || !stdout.includes('OK:')) {
+            const msg = stderr || err?.message || 'Noma\'lum xato';
+            console.error('[print-agent] Windows print xato:', msg);
+            return res.status(500).json({ ok: false, error: `Printer xato: "${printerName}". ${msg}` });
+          }
+          console.log(`[print-agent] Chek yuborildi → ${printerName}`);
+          res.json({ ok: true, printer: printerName });
+        }
+      );
+    });
   });
 }
 
