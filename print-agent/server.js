@@ -89,27 +89,40 @@ function buildReceipt(sale) {
   const store = sale.store || {};
   const user  = sale.user  || {};
   const items = Array.isArray(sale.items) ? sale.items : [];
+
   const SEP    = '='.repeat(WIDTH);
+  const DASH   = '-'.repeat(WIDTH);
   const DOTTED = '- '.repeat(Math.ceil(WIDTH / 2)).slice(0, WIDTH);
+
+  // 3 ta ustun kengligi (jami = WIDTH)
+  const NW = 20;           // mahsulot nomi
+  const QW = 7;            // miqdor (markazda)
+  const TW = WIDTH - NW - QW; // jami narx (o'ngda)
 
   // "45000" → "45,000"
   const fmt = (n) =>
     String(Math.round(Number(n) || 0)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+
+  // Miqdorni ustun markaziga joylashtirish
+  const center = (s, w) => {
+    const pad = Math.max(0, w - s.length);
+    return ' '.repeat(Math.floor(pad / 2)) + s + ' '.repeat(Math.ceil(pad / 2));
+  };
 
   const out = [];
   const cmd = (...b) => out.push(Buffer.from(b));
   const ln  = (s)    => out.push(Buffer.from(sanitize(s) + '\n', 'latin1'));
 
   // ═══ SARLAVHA ════════════════════════════════
-  cmd(ESC, 0x40);           // reset
-  cmd(ESC, 0x61, 1);        // markaz
+  cmd(ESC, 0x40);
+  cmd(ESC, 0x61, 1);
   ln(SEP);
-  cmd(ESC, 0x21, 0x10);     // ikki baravar baland + qalin
+  cmd(ESC, 0x21, 0x10);
   ln(store.name || 'MY SANTEX');
-  cmd(ESC, 0x21, 0x00);     // normal
+  cmd(ESC, 0x21, 0x00);
   if (store.address) ln(store.address);
   if (store.phone)   ln(store.phone);
-  cmd(ESC, 0x61, 0);        // chapga
+  cmd(ESC, 0x61, 0);
   ln(SEP);
 
   // ─── CHEK MA'LUMOTLARI ───────────────────────
@@ -119,52 +132,51 @@ function buildReceipt(sale) {
   ln(`Chek   : ${receiptId}`);
   ln(SEP);
 
-  // ─── MAHSULOTLAR — nuqtali chiziq bilan ajratilgan ─
+  // ─── JADVAL SARLAVHASI ────────────────────────
+  ln('Mahsulot'.padEnd(NW) + center('Miqdor', QW) + 'Jami'.padStart(TW));
+  ln(DASH);
+
+  // ─── MAHSULOTLAR ─────────────────────────────
   items.forEach((it, i) => {
     const name  = sanitize((it.product && it.product.name) || it.name || 'Tovar');
     const qty   = Number(it.quantity)  || 0;
     const price = Number(it.unitPrice) || 0;
     const total = Number(it.totalPrice != null ? it.totalPrice : qty * price);
 
-    const priceStr = fmt(total) + ' sum';
-    const prefix   = ` ${i + 1}. `;
-    const maxNm    = WIDTH - prefix.length - priceStr.length - 1;
-    const nm       = name.length > maxNm ? name.slice(0, maxNm - 2) + '..' : name;
+    const nm       = name.length > NW - 1 ? name.slice(0, NW - 3) + '..' : name;
+    const totalStr = fmt(total) + ' sum';
 
-    // Qator 1: bold nom + jami narx
-    cmd(ESC, 0x21, 0x08);   // qalin
-    ln(row(prefix + nm, priceStr));
-    cmd(ESC, 0x21, 0x00);   // normal
+    // Qator 1: nom | miqdor | jami narx
+    ln(nm.padEnd(NW) + center(String(qty), QW) + totalStr.padStart(TW));
 
-    // Qator 2: miqdor × birlik narxi
-    ln(`    ${fmt(qty)} x ${fmt(price)} sum`);
+    // Qator 2: birlik narxi (birinchi ustun ostida)
+    ln(fmt(price) + ' sum');
 
-    // Mahsulotlar orasida nuqtali chiziq (oxirgisidan keyin yo'q)
+    // Mahsulotlar orasida nuqtali chiziq
     if (i < items.length - 1) ln(DOTTED);
   });
 
   // ─── JAMI ────────────────────────────────────
   ln(SEP);
-  cmd(ESC, 0x21, 0x08);     // qalin
+  cmd(ESC, 0x21, 0x08);
   ln(row('Jami:', fmt(sale.totalAmount) + ' sum'));
   cmd(ESC, 0x21, 0x00);
   ln(SEP);
 
-  // ─── TO'LOV TURI ─────────────────────────────
-  ln(`To'lov turi : ${paymentLabel(sale.paymentMethod).toUpperCase()}`);
+  // ─── TO'LOV TURI (justify-between) ───────────
+  ln(row("To'lov turi:", paymentLabel(sale.paymentMethod).toUpperCase()));
   ln(SEP);
 
   // ─── FOOTER ──────────────────────────────────
-  cmd(ESC, 0x61, 1);        // markaz
-  cmd(ESC, 0x21, 0x08);     // qalin
+  cmd(ESC, 0x61, 1);
+  cmd(ESC, 0x21, 0x08);
   ln('Xarid uchun rahmat!');
   cmd(ESC, 0x21, 0x00);
   ln("Qaytib kelishingizni kutib qolamiz!");
   ln(SEP);
   cmd(ESC, 0x61, 0);
-
-  cmd(LF, LF, LF);          // qog'oz chiqarish
-  cmd(GS, 0x56, 0x41, 0x00); // qisman kesish
+  cmd(LF, LF, LF);
+  cmd(GS, 0x56, 0x41, 0x00);
   return Buffer.concat(out);
 }
 

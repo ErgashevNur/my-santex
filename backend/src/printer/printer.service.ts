@@ -267,25 +267,31 @@ export class PrinterService {
     if (d.customerName) t += `Mijoz  : ${d.customerName}` + LF;
     t += SEP + LF;
 
-    // ─── TOVARLAR — har biri nuqtali chiziq bilan ajratilgan ─
+    // ─── JADVAL SARLAVHASI ────────────────────────
+    const NW = 20;
+    const QW = 7;
+    const TW = W - NW - QW;
+    const center = (s: string, w: number) => {
+      const pad = Math.max(0, w - s.length);
+      return ' '.repeat(Math.floor(pad / 2)) + s + ' '.repeat(Math.ceil(pad / 2));
+    };
+    t += 'Mahsulot'.padEnd(NW) + center('Miqdor', QW) + 'Jami'.padStart(TW) + LF;
+    t += '-'.repeat(W) + LF;
+
+    // ─── MAHSULOTLAR — 3 ustun ───────────────────
     d.items.forEach((item, idx) => {
-      // Tovar nomi + jami narx (bir qatorda)
-      const prefix = ` ${idx + 1}. `;
-      const priceStr = `${fmt(item.totalPrice)} sum`;
-      const maxNm = W - prefix.length - priceStr.length - 1;
       const nm =
-        item.name.length > maxNm
-          ? item.name.slice(0, maxNm - 2) + '..'
+        item.name.length > NW - 1
+          ? item.name.slice(0, NW - 3) + '..'
           : item.name;
-      t += bold1 + rowLR(prefix + nm, priceStr) + bold0 + LF;
+      const totalStr = `${fmt(item.totalPrice)} sum`;
 
-      // Alt qator: miqdor × birlik narxi
-      t += `    ${fmt(item.quantity)} x ${fmt(item.unitPrice)} sum` + LF;
+      // Qator 1: nom | miqdor | jami
+      t += nm.padEnd(NW) + center(String(item.quantity), QW) + totalStr.padStart(TW) + LF;
+      // Qator 2: birlik narxi
+      t += `${fmt(item.unitPrice)} sum` + LF;
 
-      // Mahsulotlar orasida nuqtali chiziq (oxirgisidan keyin yo'q)
-      if (idx < d.items.length - 1) {
-        t += dotted + LF;
-      }
+      if (idx < d.items.length - 1) t += dotted + LF;
     });
 
     // ─── JAMI ────────────────────────────────────
@@ -293,9 +299,9 @@ export class PrinterService {
     t += bold1 + rowLR('Jami:', `${fmt(d.total)} sum`) + bold0 + LF;
     t += SEP + LF;
 
-    // ─── TO'LOV TURI ─────────────────────────────
+    // ─── TO'LOV TURI (justify-between) ───────────
     const payLabel = PAYMENT_LABELS[d.paymentMethod] || d.paymentMethod;
-    t += `To'lov turi : ${bold1}${payLabel.toUpperCase()}${bold0}` + LF;
+    t += rowLR("To'lov turi:", payLabel.toUpperCase()) + LF;
     t += SEP + LF;
 
     // ─── FOOTER ──────────────────────────────────
