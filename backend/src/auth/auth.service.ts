@@ -1,4 +1,8 @@
-import { Injectable, UnauthorizedException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  UnauthorizedException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { PrismaService } from '../prisma/prisma.service';
 import { LoginDto, EnrollFaceDto, FaceVerifyDto } from './dto/login.dto';
@@ -17,8 +21,9 @@ export class AuthService {
       include: { store: true },
     });
 
-    if (!user) throw new UnauthorizedException('PIN noto\'g\'ri');
-    if (!user.isActive) throw new ForbiddenException('Foydalanuvchi bloklangan');
+    if (!user) throw new UnauthorizedException("PIN noto'g'ri");
+    if (!user.isActive)
+      throw new ForbiddenException('Foydalanuvchi bloklangan');
 
     if (user.role === UserRole.SUPER_ADMIN) {
       if (!user.faceEnrolled) {
@@ -30,23 +35,40 @@ export class AuthService {
     }
 
     if (user.store && !user.store.isActive) {
-      throw new ForbiddenException('Do\'kon obunasi bloklangan. Administrator bilan bog\'laning.');
+      throw new ForbiddenException(
+        "Do'kon obunasi bloklangan. Administrator bilan bog'laning.",
+      );
     }
 
-    const token = this.jwt.sign({ sub: user.id, role: user.role, storeId: user.storeId });
-    const { pin: _, faceDescriptor: __, faceEnrolled: ___, ...userOut } = user;
+    const token = this.jwt.sign({
+      sub: user.id,
+      role: user.role,
+      storeId: user.storeId,
+    });
+
+    const {
+      pin: _pin,
+      faceDescriptor: _fd,
+      faceEnrolled: _fe,
+      ...userOut
+    } = user;
     return { token, user: userOut };
   }
 
   // Faqat bir marta: yuzni saqlash (faceEnrolled = false bo'lganda)
   async enrollFace(dto: EnrollFaceDto) {
-    const user = await this.prisma.user.findUnique({ where: { id: dto.userId }, include: { store: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.userId },
+      include: { store: true },
+    });
 
     if (!user || user.role !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Ruxsat yo\'q');
+      throw new ForbiddenException("Ruxsat yo'q");
     }
     if (user.faceEnrolled) {
-      throw new ForbiddenException('Yuz allaqachon ro\'yxatga olingan. Setup qayta ishlatib bo\'lmaydi.');
+      throw new ForbiddenException(
+        "Yuz allaqachon ro'yxatga olingan. Setup qayta ishlatib bo'lmaydi.",
+      );
     }
 
     await this.prisma.user.update({
@@ -57,36 +79,62 @@ export class AuthService {
       },
     });
 
-    const token = this.jwt.sign({ sub: user.id, role: user.role, storeId: user.storeId });
-    const { pin: _, faceDescriptor: __, faceEnrolled: ___, ...userOut } = user;
+    const token = this.jwt.sign({
+      sub: user.id,
+      role: user.role,
+      storeId: user.storeId,
+    });
+
+    const {
+      pin: _pin,
+      faceDescriptor: _fd,
+      faceEnrolled: _fe,
+      ...userOut
+    } = user;
     return { token, user: { ...userOut, faceEnrolled: true } };
   }
 
   // Har safar login paytida yuz tekshirish
   async verifyFace(dto: FaceVerifyDto) {
-    const user = await this.prisma.user.findUnique({ where: { id: dto.userId }, include: { store: true } });
+    const user = await this.prisma.user.findUnique({
+      where: { id: dto.userId },
+      include: { store: true },
+    });
 
     if (!user || user.role !== UserRole.SUPER_ADMIN) {
-      throw new UnauthorizedException('Ruxsat yo\'q');
+      throw new UnauthorizedException("Ruxsat yo'q");
     }
     if (!user.faceEnrolled || !user.faceDescriptor) {
-      throw new ForbiddenException('Avval /setup sahifasidan yuzingizni ro\'yxatga oling');
+      throw new ForbiddenException(
+        "Avval /setup sahifasidan yuzingizni ro'yxatga oling",
+      );
     }
     if (!dto.faceDescriptor || dto.faceDescriptor.length === 0) {
-      throw new ForbiddenException('Yuz ma\'lumoti yuborilmadi');
+      throw new ForbiddenException("Yuz ma'lumoti yuborilmadi");
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const saved: number[] = JSON.parse(user.faceDescriptor);
     if (saved.length < 128 || dto.faceDescriptor.length < 128) {
-      throw new ForbiddenException('Yuz ma\'lumoti noto\'g\'ri format');
+      throw new ForbiddenException("Yuz ma'lumoti noto'g'ri format");
     }
     const dist = this.euclidean(saved, dto.faceDescriptor);
     if (dist > 0.6) {
-      throw new ForbiddenException('Yuz tasdiqlanmadi. Qayta urinib ko\'ring.');
+      throw new ForbiddenException("Yuz tasdiqlanmadi. Qayta urinib ko'ring.");
     }
 
-    const token = this.jwt.sign({ sub: user.id, role: user.role, storeId: user.storeId });
-    const { pin: _, faceDescriptor: __, faceEnrolled: ___, ...userOut } = user;
+    const token = this.jwt.sign({
+      sub: user.id,
+      role: user.role,
+      storeId: user.storeId,
+    });
+
+    const {
+      pin: _pin,
+      faceDescriptor: _fd,
+      faceEnrolled: _fe,
+      ...userOut
+    } = user;
     return { token, user: userOut };
   }
 
@@ -104,7 +152,8 @@ export class AuthService {
       include: { store: true },
     });
     if (!user) throw new UnauthorizedException();
-    const { pin: _, faceDescriptor: __, faceEnrolled: ___, ...rest } = user;
+
+    const { pin: _pin, faceDescriptor: _fd, faceEnrolled: _fe, ...rest } = user;
     return rest;
   }
 }

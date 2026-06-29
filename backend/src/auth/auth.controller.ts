@@ -4,6 +4,7 @@ import { AuthService } from './auth.service';
 import { LoginDto, EnrollFaceDto, FaceVerifyDto } from './dto/login.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
+import type { JwtUser } from '../common/interfaces/jwt-user.interface';
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -29,7 +30,7 @@ export class AuthController {
   @ApiBearerAuth()
   @UseGuards(JwtAuthGuard)
   @Get('profile')
-  getProfile(@CurrentUser() user: any) {
+  getProfile(@CurrentUser() user: JwtUser) {
     return this.authService.getProfile(user.id);
   }
 }

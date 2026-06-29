@@ -1,10 +1,12 @@
 import { IsString, IsNotEmpty, IsIn } from 'class-validator';
 
 export class CreateNotificationDto {
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   title: string;
 
-  @IsString() @IsNotEmpty()
+  @IsString()
+  @IsNotEmpty()
   body: string;
 
   @IsIn(['ALL', 'ROP', 'SALES_MANAGER'])

@@ -1,13 +1,21 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
+import { Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateProductDto, UpdateProductDto, AddStockDto } from './dto/product.dto';
+import {
+  CreateProductDto,
+  UpdateProductDto,
+  AddStockDto,
+} from './dto/product.dto';
 
 @Injectable()
 export class ProductsService {
   constructor(private prisma: PrismaService) {}
 
-  async findAll(storeId: string, query?: { search?: string; categoryId?: string; lowStock?: string }) {
-    const where: any = { storeId, isActive: true };
+  async findAll(
+    storeId: string,
+    query?: { search?: string; categoryId?: string; lowStock?: string },
+  ) {
+    const where: Prisma.ProductWhereInput = { storeId, isActive: true };
 
     if (query?.search) {
       where.OR = [
@@ -26,7 +34,7 @@ export class ProductsService {
     });
 
     if (query?.lowStock === 'true') {
-      return products.filter(p => Number(p.stock) <= Number(p.minStock));
+      return products.filter((p) => Number(p.stock) <= Number(p.minStock));
     }
     return products;
   }
@@ -58,13 +66,20 @@ export class ProductsService {
   }
 
   async update(id: string, storeId: string, dto: UpdateProductDto) {
-    const product = await this.prisma.product.findFirst({ where: { id, storeId } });
+    const product = await this.prisma.product.findFirst({
+      where: { id, storeId },
+    });
     if (!product) throw new NotFoundException('Tovar topilmadi');
-    return this.prisma.product.update({ where: { id }, data: dto as any });
+    return this.prisma.product.update({
+      where: { id },
+      data: dto,
+    });
   }
 
   async addStock(id: string, storeId: string, dto: AddStockDto) {
-    const product = await this.prisma.product.findFirst({ where: { id, storeId } });
+    const product = await this.prisma.product.findFirst({
+      where: { id, storeId },
+    });
     if (!product) throw new NotFoundException('Tovar topilmadi');
     return this.prisma.product.update({
       where: { id },
@@ -73,7 +88,9 @@ export class ProductsService {
   }
 
   async remove(id: string, storeId: string) {
-    const product = await this.prisma.product.findFirst({ where: { id, storeId } });
+    const product = await this.prisma.product.findFirst({
+      where: { id, storeId },
+    });
     if (!product) throw new NotFoundException('Tovar topilmadi');
     return this.prisma.product.update({
       where: { id },

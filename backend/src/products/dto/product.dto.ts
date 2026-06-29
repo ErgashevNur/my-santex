@@ -1,7 +1,13 @@
-import { IsString, IsNumber, IsOptional, IsEnum, IsPositive, Min } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsEnum,
+  IsPositive,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { UnitType } from '@prisma/client';
-import { Transform } from 'class-transformer';
 
 export class CreateProductDto {
   @ApiProperty()

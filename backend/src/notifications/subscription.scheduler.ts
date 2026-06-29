@@ -1,5 +1,5 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { Cron, CronExpression } from '@nestjs/schedule';
+import { Cron } from '@nestjs/schedule';
 import { PrismaService } from '../prisma/prisma.service';
 
 @Injectable()
@@ -16,7 +16,7 @@ export class SubscriptionScheduler {
     const tomorrow = new Date();
     tomorrow.setDate(tomorrow.getDate() + 1);
     const tomorrowStart = new Date(tomorrow.setHours(0, 0, 0, 0));
-    const tomorrowEnd   = new Date(tomorrow.setHours(23, 59, 59, 999));
+    const tomorrowEnd = new Date(tomorrow.setHours(23, 59, 59, 999));
 
     // Ertaga tugaydigan obunali do'konlar
     const stores = await this.prisma.store.findMany({
@@ -33,7 +33,7 @@ export class SubscriptionScheduler {
     });
 
     if (stores.length === 0) {
-      this.logger.log('Ertaga tugunadigan obuna yo\'q.');
+      this.logger.log("Ertaga tugunadigan obuna yo'q.");
       return;
     }
 
@@ -43,7 +43,7 @@ export class SubscriptionScheduler {
 
     for (const store of stores) {
       const endDate = store.subscriptionEndsAt!;
-      const dateStr = `${String(endDate.getDate()).padStart(2,'0')}.${String(endDate.getMonth()+1).padStart(2,'0')}.${endDate.getFullYear()}`;
+      const dateStr = `${String(endDate.getDate()).padStart(2, '0')}.${String(endDate.getMonth() + 1).padStart(2, '0')}.${endDate.getFullYear()}`;
 
       // Bugun bu do'kon uchun xabar yuborilganmi tekshiramiz
       const alreadySent = await this.prisma.notifications.findFirst({
@@ -54,12 +54,14 @@ export class SubscriptionScheduler {
       });
 
       if (alreadySent) {
-        this.logger.log(`"${store.name}" uchun xabar bugun allaqachon yuborilgan, o'tkazib yuborildi.`);
+        this.logger.log(
+          `"${store.name}" uchun xabar bugun allaqachon yuborilgan, o'tkazib yuborildi.`,
+        );
         continue;
       }
 
       for (const rop of store.users) {
-        const notifId = `notif_sub_${Date.now()}_${Math.random().toString(36).slice(2,7)}`;
+        const notifId = `notif_sub_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
         const superAdmin = await this.prisma.user.findFirst({
           where: { role: 'SUPER_ADMIN' },
           select: { id: true },
@@ -77,12 +79,18 @@ export class SubscriptionScheduler {
           },
         });
 
-        this.logger.log(`Xabar yuborildi: ${rop.name} → "${store.name}" (${dateStr})`);
+        this.logger.log(
+          `Xabar yuborildi: ${rop.name} → "${store.name}" (${dateStr})`,
+        );
       }
     }
   }
 
-  private buildMessage(ropName: string, storeName: string, endDate: string): string {
+  private buildMessage(
+    ropName: string,
+    storeName: string,
+    endDate: string,
+  ): string {
     return (
       `Hurmatli ${ropName},\n\n` +
       `"${storeName}" do'koningizning My Santex tizimidagi obuna muddati ${endDate} kuni tugaydi.\n\n` +

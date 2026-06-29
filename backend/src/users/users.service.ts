@@ -1,4 +1,9 @@
-import { Injectable, NotFoundException, ConflictException, ForbiddenException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+  ConflictException,
+  ForbiddenException,
+} from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateUserDto, UpdateUserDto } from './dto/user.dto';
 import { UserRole } from '@prisma/client';
@@ -11,8 +16,14 @@ export class UsersService {
     return this.prisma.user.findMany({
       where: { storeId },
       select: {
-        id: true, name: true, email: true, phone: true,
-        role: true, isActive: true, createdAt: true, avatarUrl: true,
+        id: true,
+        name: true,
+        email: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        createdAt: true,
+        avatarUrl: true,
       },
       orderBy: { createdAt: 'desc' },
     });
@@ -22,28 +33,42 @@ export class UsersService {
   async findAllWithPins() {
     return this.prisma.user.findMany({
       select: {
-        id: true, name: true, phone: true, role: true,
-        isActive: true, pin: true, storeId: true,
+        id: true,
+        name: true,
+        phone: true,
+        role: true,
+        isActive: true,
+        pin: true,
+        storeId: true,
         store: { select: { name: true } },
       },
       orderBy: { createdAt: 'desc' },
     });
   }
 
-  async create(callerStoreId: string | null, dto: CreateUserDto, creatorRole: UserRole) {
+  async create(
+    callerStoreId: string | null,
+    dto: CreateUserDto,
+    creatorRole: UserRole,
+  ) {
     if (dto.role === UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('Super admin yaratishga ruxsat yo\'q');
+      throw new ForbiddenException("Super admin yaratishga ruxsat yo'q");
     }
     if (dto.role === UserRole.ROP && creatorRole !== UserRole.SUPER_ADMIN) {
-      throw new ForbiddenException('ROP faqat super admin tomonidan yaratilishi mumkin');
+      throw new ForbiddenException(
+        'ROP faqat super admin tomonidan yaratilishi mumkin',
+      );
     }
 
     // Super Admin boshqa do'kon uchun yaratganda dto.storeId ishlatiladi
-    const storeId = creatorRole === UserRole.SUPER_ADMIN && dto.storeId
-      ? dto.storeId
-      : callerStoreId;
+    const storeId =
+      creatorRole === UserRole.SUPER_ADMIN && dto.storeId
+        ? dto.storeId
+        : callerStoreId;
 
-    const existing = await this.prisma.user.findUnique({ where: { pin: dto.pin } });
+    const existing = await this.prisma.user.findUnique({
+      where: { pin: dto.pin },
+    });
     if (existing) throw new ConflictException('Bu PIN allaqachon band');
 
     const user = await this.prisma.user.create({
@@ -57,7 +82,7 @@ export class UsersService {
       },
     });
 
-    const { pin: _, faceDescriptor: __, ...result } = user;
+    const { pin: _pin, faceDescriptor: _fd, ...result } = user;
     return result;
   }
 
@@ -76,11 +101,15 @@ export class UsersService {
     const user = await this.prisma.user.findFirst({ where: { id, storeId } });
     if (!user) throw new NotFoundException('Foydalanuvchi topilmadi');
 
-    const data: any = { name: dto.name, phone: dto.phone };
+    const data: { name?: string; phone?: string; pin?: string } = {
+      name: dto.name,
+      phone: dto.phone,
+    };
     if (dto.pin) data.pin = dto.pin;
 
     const updated = await this.prisma.user.update({ where: { id }, data });
-    const { pin: _, faceDescriptor: __, ...result } = updated;
+
+    const { pin: _pin, faceDescriptor: _fd, ...result } = updated;
     return result;
   }
 }

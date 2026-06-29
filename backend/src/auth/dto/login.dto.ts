@@ -1,4 +1,11 @@
-import { IsString, Length, IsArray, IsNumber, IsOptional, ArrayMinSize } from 'class-validator';
+import {
+  IsString,
+  Length,
+  IsArray,
+  IsNumber,
+  IsOptional,
+  ArrayMinSize,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class LoginDto {

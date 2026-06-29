@@ -1,4 +1,13 @@
-import { IsString, IsNumber, IsOptional, IsEnum, IsArray, ValidateNested, IsPositive, Min } from 'class-validator';
+import {
+  IsString,
+  IsNumber,
+  IsOptional,
+  IsEnum,
+  IsArray,
+  ValidateNested,
+  IsPositive,
+  Min,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { PaymentMethod } from '@prisma/client';
 import { Type } from 'class-transformer';

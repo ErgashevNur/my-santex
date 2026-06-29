@@ -16,8 +16,10 @@ export class PrinterController {
 
   @Get('scan')
   async scan() {
-    const usbDevices = await this.printer.scanUSB();
-    const foundUsb = Object.entries(usbDevices).find(([, v]) => v === 'TOPILDI')?.[0];
+    const usbDevices = this.printer.scanUSB();
+    const foundUsb = Object.entries(usbDevices).find(
+      ([, v]) => v === 'TOPILDI',
+    )?.[0];
 
     const ip = process.env.PRINTER_IP || '192.168.1.27';
     const ports = await this.printer.scanPorts(ip);
@@ -61,25 +63,28 @@ export class PrinterController {
     });
     if (!sale) return { error: 'Sotuv topilmadi' };
 
-    const subtotal = sale.items.reduce((s, i) => s + Number(i.unitPrice) * Number(i.quantity), 0);
+    const subtotal = sale.items.reduce(
+      (s, i) => s + Number(i.unitPrice) * Number(i.quantity),
+      0,
+    );
     const result = await this.printer.printReceipt({
-      receiptNo:    sale.receiptNo,
-      storeName:    sale.store.name,
-      storePhone:   sale.store.phone,
+      receiptNo: sale.receiptNo,
+      storeName: sale.store.name,
+      storePhone: sale.store.phone,
       storeAddress: sale.store.address,
-      cashierName:  sale.user.name,
-      items: sale.items.map(i => ({
-        name:       i.product.name,
-        quantity:   Number(i.quantity),
-        unitPrice:  Number(i.unitPrice),
+      cashierName: sale.user.name,
+      items: sale.items.map((i) => ({
+        name: i.product.name,
+        quantity: Number(i.quantity),
+        unitPrice: Number(i.unitPrice),
         totalPrice: Number(i.totalPrice),
       })),
       subtotal,
-      discount:      Number(sale.discountAmount),
-      total:         Number(sale.totalAmount),
+      discount: Number(sale.discountAmount),
+      total: Number(sale.totalAmount),
       paymentMethod: sale.paymentMethod,
-      customerName:  sale.customerName,
-      createdAt:     sale.createdAt,
+      customerName: sale.customerName,
+      createdAt: sale.createdAt,
     });
     return result;
   }

@@ -1,4 +1,10 @@
-import { IsString, IsEmail, IsOptional, IsEnum, IsDateString } from 'class-validator';
+import {
+  IsString,
+  IsEmail,
+  IsOptional,
+  IsEnum,
+  IsDateString,
+} from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { SubscriptionStatus } from '@prisma/client';
 

@@ -21,13 +21,17 @@ export class CategoriesService {
   }
 
   async update(id: string, storeId: string, dto: CreateCategoryDto) {
-    const cat = await this.prisma.category.findFirst({ where: { id, storeId } });
+    const cat = await this.prisma.category.findFirst({
+      where: { id, storeId },
+    });
     if (!cat) throw new NotFoundException('Kategoriya topilmadi');
     return this.prisma.category.update({ where: { id }, data: dto });
   }
 
   async remove(id: string, storeId: string) {
-    const cat = await this.prisma.category.findFirst({ where: { id, storeId } });
+    const cat = await this.prisma.category.findFirst({
+      where: { id, storeId },
+    });
     if (!cat) throw new NotFoundException('Kategoriya topilmadi');
     return this.prisma.category.delete({ where: { id } });
   }

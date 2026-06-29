@@ -1,6 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
-import { CreateStoreDto, UpdateSubscriptionDto, CreateSubscriptionPaymentDto } from './dto/store.dto';
+import {
+  CreateStoreDto,
+  UpdateSubscriptionDto,
+  CreateSubscriptionPaymentDto,
+} from './dto/store.dto';
 import { SubscriptionStatus } from '@prisma/client';
 
 @Injectable()
@@ -21,12 +25,20 @@ export class StoresService {
     const store = await this.prisma.store.findUnique({
       where: { id },
       include: {
-        users: { select: { id: true, name: true, email: true, role: true, isActive: true } },
+        users: {
+          select: {
+            id: true,
+            name: true,
+            email: true,
+            role: true,
+            isActive: true,
+          },
+        },
         _count: { select: { products: true, sales: true } },
         payments: { orderBy: { paidAt: 'desc' }, take: 5 },
       },
     });
-    if (!store) throw new NotFoundException('Do\'kon topilmadi');
+    if (!store) throw new NotFoundException("Do'kon topilmadi");
     return store;
   }
 
@@ -39,8 +51,12 @@ export class StoresService {
       where: { id },
       data: {
         subscriptionStatus: dto.status,
-        subscriptionEndsAt: dto.subscriptionEndsAt ? new Date(dto.subscriptionEndsAt) : undefined,
-        isActive: dto.status === SubscriptionStatus.ACTIVE || dto.status === SubscriptionStatus.TRIAL,
+        subscriptionEndsAt: dto.subscriptionEndsAt
+          ? new Date(dto.subscriptionEndsAt)
+          : undefined,
+        isActive:
+          dto.status === SubscriptionStatus.ACTIVE ||
+          dto.status === SubscriptionStatus.TRIAL,
       },
     });
   }
@@ -69,12 +85,13 @@ export class StoresService {
   }
 
   async getDashboardStats() {
-    const [totalStores, activeStores, expiredStores, totalRevenue] = await Promise.all([
-      this.prisma.store.count(),
-      this.prisma.store.count({ where: { subscriptionStatus: 'ACTIVE' } }),
-      this.prisma.store.count({ where: { subscriptionStatus: 'EXPIRED' } }),
-      this.prisma.subscriptionPayment.aggregate({ _sum: { amount: true } }),
-    ]);
+    const [totalStores, activeStores, expiredStores, totalRevenue] =
+      await Promise.all([
+        this.prisma.store.count(),
+        this.prisma.store.count({ where: { subscriptionStatus: 'ACTIVE' } }),
+        this.prisma.store.count({ where: { subscriptionStatus: 'EXPIRED' } }),
+        this.prisma.subscriptionPayment.aggregate({ _sum: { amount: true } }),
+      ]);
 
     return {
       totalStores,
