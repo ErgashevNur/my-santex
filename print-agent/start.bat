@@ -19,8 +19,10 @@ if not exist node_modules (
   npm install
 )
 
-echo  Printer: %PRINTER_NAME%
-if "%PRINTER_NAME%"=="" echo  Printer: XP-80 (default)
+set PRINTER_IP=192.168.1.38
+set PRINTER_PORT=9100
+
+echo  Printer: %PRINTER_IP%:%PRINTER_PORT% (network)
 echo  Manzil : http://localhost:5555
 echo  To'xtatish uchun: Ctrl+C
 echo.
