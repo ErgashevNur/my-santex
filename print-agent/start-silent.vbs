@@ -8,16 +8,16 @@ oShell.CurrentDirectory = strDir
 '
 ' USB printer uchun: PRINTER_IP ni bo'sh qoldiring
 '   oShell.Environment("Process")("PRINTER_IP") = ""
-'   oShell.Environment("Process")("PRINTER_NAME") = "XP-80T"
+'   oShell.Environment("Process")("PRINTER_NAME") = "XP-80"
 '
 ' Tarmoq printer uchun: IP manzilni kiriting
 '   oShell.Environment("Process")("PRINTER_IP") = "192.168.1.38"
 ' ================================================================
 
-' USB ulangan printer uchun (PRINTER_NAME ni o'zgartiring):
+' USB ulangan printer uchun (PRINTER_NAME ni Windows printer nomi bilan mos keltiring):
 oShell.Environment("Process")("PRINTER_IP") = ""
 oShell.Environment("Process")("PRINTER_PORT") = "9100"
-oShell.Environment("Process")("PRINTER_NAME") = "XP-80T"
+oShell.Environment("Process")("PRINTER_NAME") = "XP-80"
 
 ' Tarmoq printer uchun yuqoridagi 3 qatorni o'chirib, quyidagini yoqing:
 ' oShell.Environment("Process")("PRINTER_IP") = "192.168.1.38"

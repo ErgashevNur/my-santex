@@ -16,6 +16,13 @@ if %errorlevel% neq 0 (
   exit /b 1
 )
 
+REM ---- Eski agentni o'chirish (port 5555 bo'sh bo'lsin) ----
+echo  Eski agent tekshirilmoqda...
+for /f "tokens=5" %%a in ('netstat -aon 2^>nul ^| findstr ":5555 " ^| findstr "LISTENING"') do (
+  taskkill /F /PID %%a >nul 2>&1
+)
+timeout /t 1 /nobreak >nul
+
 REM ---- Windowsdagi printerlar ro'yxati ----
 echo  Kompyuterga ulangan printerlar:
 powershell -NoProfile -NonInteractive -Command "Get-Printer | ForEach-Object { Write-Host ('    ' + $_.Name) }" 2>nul
@@ -26,7 +33,7 @@ REM  SOZLAMALAR — ehtiyojga qarab o'zgartiring:
 REM
 REM  1) Printer USB kabel bilan ulangan bo'lsa:
 REM     - PRINTER_IP ni bo'sh qoldiring
-REM     - PRINTER_NAME ni yuqoridagi ro'yxatdan aniq nusxa ko'chiring
+REM     - PRINTER_NAME ni yuqoridagi ro'yxatdan ANIQ nusxa ko'chiring
 REM
 REM  2) Printer tarmoq orqali ulangan bo'lsa (Wi-Fi yoki kabel):
 REM     - PRINTER_IP ga printer IP manzilini kiriting
@@ -35,7 +42,7 @@ REM ================================================================
 
 set PRINTER_IP=
 set PRINTER_PORT=9100
-set PRINTER_NAME=XP-80T
+set PRINTER_NAME=XP-80
 
 REM ================================================================
 
@@ -46,13 +53,10 @@ if not "%PRINTER_IP%"=="" (
 ) else (
   echo   Rejim   : Windows spooler ^(USB^)
   echo   Printer : %PRINTER_NAME%
-  echo.
-  echo   DIQQAT: PRINTER_NAME yuqoridagi ro'yxat bilan mos bo'lishi shart!
-  echo   Mos kelmasa start.bat ichidagi PRINTER_NAME ni o'zgartiring.
 )
 echo.
 echo   Manzil  : http://localhost:5555
-echo   Printerlar ro'yxati: http://localhost:5555/printers
+echo   Diagnostika: http://localhost:5555/printers
 echo.
 echo  To'xtatish uchun Ctrl+C bosing
 echo.
