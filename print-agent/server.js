@@ -71,8 +71,18 @@ function sendWindows(buf, res) {
       return res.status(500).json({ ok: false, error: writeErr.message });
     }
 
-    const psScript = `$bytes = [System.IO.File]::ReadAllBytes("${prnEsc}")
-Add-Type -TypeDefinition @'
+    const psScript = `$ErrorActionPreference = "Stop"
+try {
+  # Printer mavjudligini tekshir
+  $p = Get-WmiObject Win32_Printer -Filter "Name='${printerName}'" -ErrorAction SilentlyContinue
+  if ($null -eq $p) {
+    $all = (Get-WmiObject Win32_Printer | ForEach-Object { $_.Name }) -join " | "
+    throw "Printer '${printerName}' topilmadi. Windows da mavjud: $all"
+  }
+
+  $bytes = [System.IO.File]::ReadAllBytes("${prnEsc}")
+
+  Add-Type -TypeDefinition @'
 using System;
 using System.Runtime.InteropServices;
 public class RawPrint {
@@ -97,20 +107,30 @@ public class RawPrint {
     [MarshalAs(UnmanagedType.LPStr)] public string pDataType;
   }
 }
-'@
-$h=[IntPtr]::Zero
-[RawPrint]::OpenPrinter("${printerName}",[ref]$h,[IntPtr]::Zero)|Out-Null
-$di=New-Object RawPrint+DOCINFO
-$di.pDocName="Chek"
-$di.pDataType="RAW"
-[RawPrint]::StartDocPrinter($h,1,[ref]$di)|Out-Null
-[RawPrint]::StartPagePrinter($h)|Out-Null
-$w=0
-[RawPrint]::WritePrinter($h,$bytes,$bytes.Length,[ref]$w)|Out-Null
-[RawPrint]::EndPagePrinter($h)|Out-Null
-[RawPrint]::EndDocPrinter($h)|Out-Null
-[RawPrint]::ClosePrinter($h)|Out-Null
-Write-Output "OK:$w"
+'@ -ErrorAction SilentlyContinue
+
+  $h = [IntPtr]::Zero
+  $opened = [RawPrint]::OpenPrinter("${printerName}", [ref]$h, [IntPtr]::Zero)
+  if (-not $opened -or $h -eq [IntPtr]::Zero) {
+    $win32err = [System.Runtime.InteropServices.Marshal]::GetLastWin32Error()
+    throw "OpenPrinter muvaffaqiyatsiz. Win32 xato kodi: $win32err"
+  }
+
+  $di = New-Object RawPrint+DOCINFO
+  $di.pDocName  = "Chek"
+  $di.pDataType = "RAW"
+  [RawPrint]::StartDocPrinter($h, 1, [ref]$di) | Out-Null
+  [RawPrint]::StartPagePrinter($h) | Out-Null
+  $w = 0
+  [RawPrint]::WritePrinter($h, $bytes, $bytes.Length, [ref]$w) | Out-Null
+  [RawPrint]::EndPagePrinter($h) | Out-Null
+  [RawPrint]::EndDocPrinter($h) | Out-Null
+  [RawPrint]::ClosePrinter($h) | Out-Null
+  Write-Output "OK:$w"
+} catch {
+  Write-Error $_.Exception.Message
+  exit 1
+}
 `;
 
     fs.writeFile(ps1File, psScript, (psErr) => {
@@ -125,9 +145,9 @@ Write-Output "OK:$w"
           fs.unlink(prnFile, () => {});
           fs.unlink(ps1File, () => {});
           if (err || !stdout.includes('OK:')) {
-            const msg = stderr || err?.message || 'Noma\'lum xato';
-            console.error('[print-agent] Windows print xato:', msg);
-            return res.status(500).json({ ok: false, error: `Printer xato: "${printerName}". ${msg}` });
+            const msg = (stderr || err?.message || 'Noma\'lum xato').trim();
+            console.error('[print-agent] Windows print xato:\n', msg);
+            return res.status(500).json({ ok: false, error: msg });
           }
           console.log(`[print-agent] Chek yuborildi → ${printerName}`);
           res.json({ ok: true, printer: printerName });
