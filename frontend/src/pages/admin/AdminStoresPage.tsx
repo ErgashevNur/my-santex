@@ -14,7 +14,7 @@ import { Plus, Building2, Users, Package, UserPlus, Eye, EyeOff, KeyRound } from
 const statusLabels: Record<string, string> = {
   ACTIVE: 'Faol', EXPIRED: 'Muddati o\'tgan', BLOCKED: 'Bloklangan', TRIAL: 'Sinov'
 }
-const statusVariants: Record<string, any> = {
+const statusVariants: Record<string, 'green' | 'red' | 'yellow'> = {
   ACTIVE: 'green', EXPIRED: 'red', BLOCKED: 'red', TRIAL: 'yellow'
 }
 const roleLabels: Record<string, string> = {
@@ -25,11 +25,15 @@ export default function AdminStoresPage() {
   const qc = useQueryClient()
 
   const [createOpen, setCreateOpen] = useState(false)
-  const [subscriptionModal, setSubscriptionModal] = useState<any>(null)
+  interface Store { id: string; name: string; email?: string; phone?: string; subscriptionStatus: string; subscriptionEndsAt?: string; _count?: { users: number; products: number } }
+  interface StoreUser { id: string; name: string; role: string; isActive?: boolean }
+  interface PinUser { id: string; storeId: string; pin: string }
+
+  const [subscriptionModal, setSubscriptionModal] = useState<Store | null>(null)
   const [storeForm, setStoreForm] = useState({ name: '', address: '', phone: '', email: '' })
   const [subForm, setSubForm] = useState({ status: 'ACTIVE', subscriptionEndsAt: '' })
 
-  const [usersStore, setUsersStore] = useState<any>(null)
+  const [usersStore, setUsersStore] = useState<Store | null>(null)
   const [addUserOpen, setAddUserOpen] = useState(false)
   const [userForm, setUserForm] = useState({ name: '', pin: '', phone: '', role: 'ROP' })
   const [showPins, setShowPins] = useState<Record<string, boolean>>({})
@@ -61,12 +65,12 @@ export default function AdminStoresPage() {
   })
 
   const subMutation = useMutation({
-    mutationFn: ({ id, data }: any) => storesApi.updateSubscription(id, data),
+    mutationFn: ({ id, data }: { id: string; data: typeof subForm }) => storesApi.updateSubscription(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['stores'] }); setSubscriptionModal(null) },
   })
 
   const addUserMutation = useMutation({
-    mutationFn: (data: any) => usersApi.create(data),
+    mutationFn: (data: Record<string, unknown>) => usersApi.create(data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['store-users', usersStore?.id] })
       qc.invalidateQueries({ queryKey: ['stores'] })
@@ -76,7 +80,7 @@ export default function AdminStoresPage() {
     },
   })
 
-  const storePins = (allPins as any[]).filter((u: any) => u.storeId === usersStore?.id)
+  const storePins = (allPins as PinUser[]).filter((u) => u.storeId === usersStore?.id)
 
   return (
     <div className="space-y-5">
@@ -95,7 +99,7 @@ export default function AdminStoresPage() {
         <p className="text-center py-12 text-slate-400">Yuklanmoqda...</p>
       ) : (
         <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-3 gap-4">
-          {stores.map((store: any) => (
+          {(stores as Store[]).map((store) => (
             <Card key={store.id} padding={false} className="p-4 sm:p-5">
               {/* Karta sarlavhasi */}
               <div className="flex items-start justify-between gap-2 mb-3">
@@ -237,7 +241,7 @@ export default function AdminStoresPage() {
                 </div>
                 {addUserMutation.error && (
                   <p className="text-xs text-red-600">
-                    {(addUserMutation.error as any)?.response?.data?.message || 'Xato yuz berdi'}
+                    {(addUserMutation.error as { response?: { data?: { message?: string } } })?.response?.data?.message || 'Xato yuz berdi'}
                   </p>
                 )}
                 <div className="flex justify-end gap-2">
@@ -261,8 +265,8 @@ export default function AdminStoresPage() {
               <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 flex items-center gap-2">
                 <KeyRound size={13} className="shrink-0" /> PIN kodlar maxfiy — faqat xodimga bering
               </p>
-              {storeUsers.map((u: any) => {
-                const pinData = storePins.find((p: any) => p.id === u.id)
+              {(storeUsers as StoreUser[]).map((u) => {
+                const pinData = storePins.find((p) => p.id === u.id)
                 return (
                   <div key={u.id} className="flex items-center justify-between gap-2 p-3 rounded-xl border border-slate-100 bg-white">
                     <div className="flex items-center gap-2.5 min-w-0">

@@ -1,6 +1,6 @@
 const AGENT_URL = 'http://localhost:5555';
 
-export async function printViaAgent(sale: any): Promise<void> {
+export async function printViaAgent(sale: Record<string, unknown>): Promise<void> {
   try {
     const res = await fetch(`${AGENT_URL}/print`, {
       method: 'POST',

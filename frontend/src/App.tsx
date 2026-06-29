@@ -24,6 +24,7 @@ const queryClient = new QueryClient({
 function AppContent() {
   const { loadUser, logout } = useAuthStore()
 
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadUser()
     const handler = () => logout()

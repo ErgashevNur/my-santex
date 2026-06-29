@@ -214,18 +214,8 @@ export default function LoginPage() {
   const [faceUserId, setFaceUserId] = useState<string | null>(null)
   const submitting = useRef(false)
   const pinRef = useRef('')
-  pinRef.current = pin
 
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if (e.metaKey || e.ctrlKey || e.altKey) return
-      if (e.key >= '0' && e.key <= '9') handleKey(e.key)
-      else if (e.key === 'Backspace') handleKey('⌫')
-      else if (e.key === 'Enter') doLogin(pinRef.current)
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [])
+  useEffect(() => { pinRef.current = pin }, [pin])
 
   const doLogin = async (value: string) => {
     if (submitting.current || value.length !== 8) return
@@ -241,8 +231,8 @@ export default function LoginPage() {
         const { user } = useAuthStore.getState()
         navigate(user?.role === 'SUPER_ADMIN' ? '/admin' : '/dashboard', { replace: true })
       }
-    } catch (err: any) {
-      const msg = err.response?.data?.message
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
       setError(Array.isArray(msg) ? msg.join(', ') : msg || "PIN noto'g'ri")
       setShaking(true)
       setPin('')
@@ -264,6 +254,18 @@ export default function LoginPage() {
       return next
     })
   }
+
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.metaKey || e.ctrlKey || e.altKey) return
+      if (e.key >= '0' && e.key <= '9') handleKey(e.key)
+      else if (e.key === 'Backspace') handleKey('⌫')
+      else if (e.key === 'Enter') doLogin(pinRef.current)
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
 
   const handleFaceSuccess = async (descriptor: number[]) => {
     if (!faceUserId) return

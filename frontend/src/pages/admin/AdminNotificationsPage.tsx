@@ -54,9 +54,10 @@ export default function AdminNotificationsPage() {
     create.mutate({ title: title.trim(), body: body.trim(), target })
   }
 
-  const items = notifications as any[]
+  interface NotifAdmin { id: string; title: string; body: string; target: string; createdAt: string; readCount?: number }
+  const items = notifications as NotifAdmin[]
   const totalSent = items.length
-  const totalReads = items.reduce((s: number, n: any) => s + (n.readCount || 0), 0)
+  const totalReads = items.reduce((s: number, n) => s + (n.readCount || 0), 0)
 
   return (
     <div className="space-y-5">

@@ -10,7 +10,7 @@ export const salesApi = {
   getOne: (id: string) =>
     api.get(`/sales/${id}`).then(r => r.data),
 
-  create: (data: any) =>
+  create: (data: Record<string, unknown>) =>
     api.post('/sales', data).then(r => r.data),
 
   reprint: (saleId: string) =>

@@ -7,10 +7,10 @@ export const productsApi = {
   getByBarcode: (barcode: string) =>
     api.get(`/products/barcode/${barcode}`).then(r => r.data),
 
-  create: (data: any) =>
+  create: (data: Record<string, unknown>) =>
     api.post('/products', data).then(r => r.data),
 
-  update: (id: string, data: any) =>
+  update: (id: string, data: Record<string, unknown>) =>
     api.put(`/products/${id}`, data).then(r => r.data),
 
   addStock: (id: string, quantity: number) =>

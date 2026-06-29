@@ -24,7 +24,7 @@ function playChime() {
       osc.start(t)
       osc.stop(t + 0.22)
     })
-  } catch {}
+  } catch { /* AudioContext may not be available in all browsers */ }
 }
 
 export default function NotificationBell() {
@@ -97,9 +97,10 @@ export default function NotificationBell() {
     },
   })
 
+  interface NotifItem { id: string; title: string; body: string; isRead: boolean; createdAt: string }
   const unread = (countData?.count ?? 0) as number
-  const items = notifications as any[]
-  const hasUnread = items.some((n: any) => !n.isRead)
+  const items = notifications as NotifItem[]
+  const hasUnread = items.some((n) => !n.isRead)
 
   if (isAdmin) {
     return (
@@ -159,7 +160,7 @@ export default function NotificationBell() {
                 <p className="text-sm text-slate-400">Hozircha bildirishnoma yo'q</p>
               </div>
             )}
-            {items.map((n: any) => (
+            {items.map((n) => (
               <div
                 key={n.id}
                 className={`px-4 py-3 transition-colors hover:bg-slate-50 ${!n.isRead ? 'bg-blue-50/40' : ''}`}

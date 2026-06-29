@@ -1,7 +1,7 @@
 import { useQuery } from '@tanstack/react-query'
 import { salesApi } from '../../api/sales'
 import { productsApi } from '../../api/products'
-import { Card, CardHeader, CardTitle } from '../../components/ui/Card'
+import { Card } from '../../components/ui/Card'
 import { formatCurrency, formatDate } from '../../lib/utils'
 import { TrendingUp, ShoppingCart, Package, AlertTriangle } from 'lucide-react'
 import { useAuthStore } from '../../store/auth.store'
@@ -88,7 +88,7 @@ export default function DashboardPage() {
             <h3 className="font-semibold text-slate-800">So'nggi sotuvlar</h3>
           </div>
           <div className="divide-y divide-slate-100">
-            {recentSales?.slice(0, 8).map((sale: any) => (
+            {(recentSales as { id: string; totalAmount: number; createdAt: string; customerName?: string }[] | undefined)?.slice(0, 8).map((sale) => (
               <div key={sale.id} className="flex items-center justify-between px-5 py-3">
                 <div>
                   <p className="text-sm font-medium text-slate-700">
@@ -115,7 +115,7 @@ export default function DashboardPage() {
             <h3 className="font-semibold text-slate-800">Kam qolgan tovarlar</h3>
           </div>
           <div className="divide-y divide-slate-100">
-            {lowStockProducts?.slice(0, 8).map((product: any) => (
+            {(lowStockProducts as { id: string; name: string; stock: number; minStock: number; category?: { name: string } }[] | undefined)?.slice(0, 8).map((product) => (
               <div key={product.id} className="flex items-center justify-between px-5 py-3">
                 <div>
                   <p className="text-sm font-medium text-slate-700">{product.name}</p>

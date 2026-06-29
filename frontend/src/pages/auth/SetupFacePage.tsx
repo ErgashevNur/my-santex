@@ -1,9 +1,7 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../../store/auth.store'
-import Button from '../../components/ui/Button'
-import Input from '../../components/ui/Input'
-import { Droplets, ShieldCheck, Hash } from 'lucide-react'
+import { ShieldCheck, Hash } from 'lucide-react'
 import FaceVerifyModal from '../../components/auth/FaceVerifyModal'
 
 type Step = 'pin' | 'face'
@@ -36,8 +34,8 @@ export default function SetupFacePage() {
         // Kutilmagan holat
         setError('Bu sahifa faqat Super Admin uchun')
       }
-    } catch (err: any) {
-      const msg = err.response?.data?.message
+    } catch (err: unknown) {
+      const msg = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
       setError(Array.isArray(msg) ? msg.join(', ') : msg || 'PIN noto\'g\'ri')
     }
   }

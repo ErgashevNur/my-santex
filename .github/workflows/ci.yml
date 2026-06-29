@@ -79,11 +79,11 @@ jobs:
       - name: Install
         run: npm ci
 
-      - name: Lint
-        run: npm run lint
-
       - name: Prisma generate
         run: npx prisma generate
+
+      - name: Lint
+        run: npm run lint
 
       - name: Prisma migrate
         run: npx prisma migrate deploy

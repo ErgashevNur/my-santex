@@ -117,8 +117,8 @@ export default function FaceVerifyModal({ mode = 'verify', onSuccess, onCancel }
         try {
           await onSuccess(avg)
           setStatus('success')
-        } catch (err: any) {
-          const msg = err.response?.data?.message
+        } catch (err: unknown) {
+          const msg = (err as { response?: { data?: { message?: string | string[] } } })?.response?.data?.message
           const text = Array.isArray(msg) ? msg.join(', ') : msg || 'Yuz tasdiqlanmadi'
           setStatus('face_mismatch')
           setMessage(text)

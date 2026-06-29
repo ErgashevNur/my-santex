@@ -91,10 +91,10 @@ export const useAuthStore = create<AuthState>((set) => ({
     try {
       const user = await authApi.getProfile()
       set({ user, isInitializing: false })
-    } catch (err: any) {
+    } catch (err: unknown) {
       // Faqat 401 (token yaroqsiz) bo'lganda chiqar
       // Network xatosi yoki server vaqtincha to'xtaganda chiqarmaymiz
-      if (err?.response?.status === 401) {
+      if ((err as { response?: { status?: number } })?.response?.status === 401) {
         localStorage.removeItem('token')
         set({ user: null, token: null, isInitializing: false })
       } else {

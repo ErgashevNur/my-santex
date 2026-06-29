@@ -37,7 +37,9 @@ export default function ProductsPage() {
   const [lowStockFilter, setLowStockFilter] = useState(false)
   const [modalOpen, setModalOpen] = useState(false)
   const [stockModalOpen, setStockModalOpen] = useState(false)
-  const [editProduct, setEditProduct] = useState<any>(null)
+  interface Product { id: string; name: string; unit: string; costPrice: number; sellPrice: number; stock: number; minStock: number; categoryId?: string; description?: string; category?: { name: string }; isActive: boolean }
+  interface Category { id: string; name: string }
+  const [editProduct, setEditProduct] = useState<Product | null>(null)
   const [form, setForm] = useState<ProductForm>(emptyForm)
   const [addQty, setAddQty] = useState('')
 
@@ -60,11 +62,11 @@ export default function ProductsPage() {
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); closeModal() },
   })
   const updateMutation = useMutation({
-    mutationFn: ({ id, data }: any) => productsApi.update(id, data),
+    mutationFn: ({ id, data }: { id: string; data: Record<string, unknown> }) => productsApi.update(id, data),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); closeModal() },
   })
   const addStockMutation = useMutation({
-    mutationFn: ({ id, quantity }: any) => productsApi.addStock(id, quantity),
+    mutationFn: ({ id, quantity }: { id: string; quantity: number }) => productsApi.addStock(id, quantity),
     onSuccess: () => { qc.invalidateQueries({ queryKey: ['products'] }); setStockModalOpen(false) },
   })
   const deleteMutation = useMutation({
@@ -73,7 +75,7 @@ export default function ProductsPage() {
   })
 
   const openCreate = () => { setEditProduct(null); setForm(emptyForm); setModalOpen(true) }
-  const openEdit = (p: any) => {
+  const openEdit = (p: Product) => {
     setEditProduct(p)
     setForm({
       name: p.name, categoryId: p.categoryId || '',
@@ -98,7 +100,7 @@ export default function ProductsPage() {
     else createMutation.mutate(data)
   }
 
-  const categoryOptions = categories.map((c: any) => ({ value: c.id, label: c.name }))
+  const categoryOptions = (categories as Category[]).map((c) => ({ value: c.id, label: c.name }))
 
   return (
     <div className="space-y-5">
@@ -163,7 +165,7 @@ export default function ProductsPage() {
               ) : products.length === 0 ? (
                 <tr><td colSpan={7} className="text-center py-12 text-slate-400">Tovarlar topilmadi</td></tr>
               ) : (
-                products.map((p: any) => {
+                (products as Product[]).map((p) => {
                   const isLow = Number(p.stock) <= Number(p.minStock)
                   return (
                     <tr key={p.id} className="hover:bg-slate-50 transition-colors">

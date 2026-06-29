@@ -10,8 +10,17 @@ const money = (n: number | string) => {
   return Math.round(v).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ' ') + ' sum';
 };
 
-export function printReceipt(sale: any) {
-  const items: any[] = sale.items || [];
+interface ReceiptItem { product?: { name?: string }; quantity: number; unitPrice: number; totalPrice: number }
+interface ReceiptSale {
+  receiptNo?: number; createdAt?: string; totalAmount?: number; paymentMethod?: string
+  discountAmount?: number; customerName?: string
+  items?: ReceiptItem[]
+  store?: { name?: string; address?: string; phone?: string }
+  user?: { name?: string }
+}
+
+export function printReceipt(sale: ReceiptSale) {
+  const items: ReceiptItem[] = sale.items || [];
   const store = sale.store || {};
   const user = sale.user || {};
 
@@ -20,13 +29,13 @@ export function printReceipt(sale: any) {
   const dateStr = `${pad(dt.getDate())}.${pad(dt.getMonth() + 1)}.${dt.getFullYear()}`;
   const timeStr = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
 
-  const subtotal = items.reduce((s: number, i: any) => s + Number(i.totalPrice), 0);
+  const subtotal = items.reduce((s: number, i) => s + Number(i.totalPrice), 0);
   const receiptNo = `#${String(sale.receiptNo).padStart(4, '0')}`;
   const discount = Number(sale.discountAmount || 0);
 
   const itemsHtml = items
     .map(
-      (item: any, idx: number) => `
+      (item: ReceiptItem, idx: number) => `
     <div class="sep"></div>
     <div class="item-name">${idx + 1}. ${item.product?.name || ''}</div>
     <div class="row">

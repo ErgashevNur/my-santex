@@ -25,6 +25,13 @@ interface CartItem {
   unitPrice: number
 }
 
+interface SaleProduct { id: string; name: string; sellPrice: number; stock: number }
+interface HistorySale {
+  id: string; receiptNo: number; totalAmount: number; createdAt: string
+  paymentMethod: string; customerName?: string
+  user?: { name: string }; items?: unknown[]
+}
+
 export default function SalesPage() {
   const qc = useQueryClient()
   const [view, setView] = useState<View>('pos')
@@ -75,7 +82,7 @@ export default function SalesPage() {
   })
 
   // ── Cart helpers ───────────────────────────────────────────────────────────
-  const addToCart = (product: any) => {
+  const addToCart = (product: SaleProduct) => {
     setCart(prev => {
       const exists = prev.find(i => i.productId === product.id)
       if (exists) return prev.map(i => i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i)
@@ -184,7 +191,7 @@ export default function SalesPage() {
                 ) : sales.length === 0 ? (
                   <tr><td colSpan={8} className="text-center py-12 text-slate-400">Sotuvlar topilmadi</td></tr>
                 ) : (
-                  (sales as any[]).map((sale) => (
+                  (sales as HistorySale[]).map((sale) => (
                     <tr key={sale.id} className="hover:bg-slate-50">
                       <td className="px-4 py-3">
                         <span className="font-mono font-bold text-blue-600 bg-blue-50 px-2 py-0.5 rounded text-xs">
@@ -269,7 +276,7 @@ export default function SalesPage() {
         <Card className={cn('flex flex-col overflow-hidden p-4', mobileTab !== 'search' && 'hidden lg:flex')}>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold text-slate-700">Tovarlar</p>
-            <span className="text-xs text-slate-400">{(products as any[]).length} ta</span>
+            <span className="text-xs text-slate-400">{(products as SaleProduct[]).length} ta</span>
           </div>
           <Input
             placeholder="Qidirish..."
@@ -282,7 +289,7 @@ export default function SalesPage() {
             {products.length === 0 && (
               <p className="text-center py-8 text-sm text-slate-400">Tovar topilmadi</p>
             )}
-            {(products as any[]).map(p => {
+            {(products as SaleProduct[]).map(p => {
               const stock = Number(p.stock)
               const outOfStock = stock <= 0
               const lowStock = stock > 0 && stock <= 5
