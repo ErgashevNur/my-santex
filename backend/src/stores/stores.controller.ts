@@ -11,6 +11,7 @@ import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { StoresService } from './stores.service';
 import {
   CreateStoreDto,
+  UpdateStoreInfoDto,
   UpdateSubscriptionDto,
   CreateSubscriptionPaymentDto,
 } from './dto/store.dto';
@@ -45,6 +46,11 @@ export class StoresController {
   @Post()
   create(@Body() dto: CreateStoreDto) {
     return this.storesService.create(dto);
+  }
+
+  @Patch(':id')
+  updateInfo(@Param('id') id: string, @Body() dto: UpdateStoreInfoDto) {
+    return this.storesService.updateInfo(id, dto);
   }
 
   @Patch(':id/subscription')

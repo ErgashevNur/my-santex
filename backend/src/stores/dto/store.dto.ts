@@ -29,6 +29,23 @@ export class CreateStoreDto {
   email?: string;
 }
 
+export class UpdateStoreInfoDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  address?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  phone?: string;
+}
+
 export class UpdateSubscriptionDto {
   @ApiProperty({ enum: SubscriptionStatus })
   @IsEnum(SubscriptionStatus)

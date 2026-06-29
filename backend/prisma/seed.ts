@@ -23,11 +23,14 @@ async function main() {
   // Demo Store
   const store = await prisma.store.upsert({
     where: { email: 'demo@santex.uz' },
-    update: {},
+    update: {
+      name: 'My Santex',
+      address: "Qirguli Tabassum ko'chasi",
+    },
     create: {
-      name: 'Demo Santex Do\'koni',
+      name: 'My Santex',
       email: 'demo@santex.uz',
-      address: 'Toshkent sh., Chilonzor t.',
+      address: "Qirguli Tabassum ko'chasi",
       phone: '+998901234567',
       subscriptionStatus: SubscriptionStatus.ACTIVE,
       subscriptionEndsAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
