@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { debtorsApi } from '../../api/debtors'
 import { formatCurrency } from '../../lib/utils'
-import { Search, Plus, X, UserPlus, Phone, ChevronRight } from 'lucide-react'
+import { Search, X, UserPlus, Phone, ChevronRight } from 'lucide-react'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -113,7 +113,7 @@ export default function DebtorsPage() {
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map((debtor, i) => (
+            {filtered.map((debtor) => (
               <button
                 key={debtor.id}
                 onClick={() => navigate(`/debtors/${debtor.id}`)}
