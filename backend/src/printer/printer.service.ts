@@ -231,15 +231,16 @@ export class PrinterService {
     const normal = `${ESC}\x21\x00`;
     const alignL = `${ESC}\x61\x00`;
     const alignC = `${ESC}\x61\x01`;
-    const LF   = '\n';
-    const SEP  = '='.repeat(W);
-    const dash = '-'.repeat(W);
+    const LF     = '\n';
+    const SEP    = '='.repeat(W);
+    const dash   = '-'.repeat(W);
+    const dotted = '- '.repeat(Math.ceil(W / 2)).slice(0, W);
 
     // "45000" → "45,000"
     const fmt = (n: number) =>
       String(Math.round(n)).replace(/\B(?=(\d{3})+(?!\d))/g, ',');
 
-    // Chap + o'ng (to'ldirib W ga yetkazadi)
+    // Chap + o'ng tekislash (jami W belgiga yetkazadi)
     const rowLR = (left: string, right: string) => {
       const gap = W - left.length - right.length;
       return left + ' '.repeat(Math.max(1, gap)) + right;
@@ -265,38 +266,40 @@ export class PrinterService {
     t += `Kassir : ${d.cashierName}` + LF;
     t += `Chek   : ${bold1}${receiptId}${bold0}` + LF;
     if (d.customerName) t += `Mijoz  : ${d.customerName}` + LF;
+    t += SEP + LF;
 
-    // ─── TOVARLAR JADVALI ────────────────────────
-    t += dash + LF;
-    const NW = 24;  // nom ustuni
-    const QW = 6;   // miqdor ustuni
-    const PW = W - NW - QW;  // narx ustuni (o'ngga)
-    t += 'Mahsulot'.padEnd(NW) + 'Miqdor'.padEnd(QW) + 'Narx'.padStart(PW) + LF;
-    t += dash + LF;
-
-    d.items.forEach((item) => {
+    // ─── TOVARLAR — har biri nuqtali chiziq bilan ajratilgan ─
+    d.items.forEach((item, idx) => {
+      // Tovar nomi + jami narx (bir qatorda)
+      const prefix = ` ${idx + 1}. `;
+      const priceStr = `${fmt(item.totalPrice)} sum`;
+      const maxNm = W - prefix.length - priceStr.length - 1;
       const nm =
-        item.name.length > NW - 1
-          ? item.name.slice(0, NW - 3) + '..'
+        item.name.length > maxNm
+          ? item.name.slice(0, maxNm - 2) + '..'
           : item.name;
-      const qtyStr   = String(item.quantity);
-      const priceStr = fmt(item.totalPrice);
-      t += nm.padEnd(NW) + qtyStr.padEnd(QW) + priceStr.padStart(PW) + LF;
-      // Alt qator: birlik narxi
-      t += `  @ ${fmt(item.unitPrice)} sum` + LF;
+      t += bold1 + rowLR(prefix + nm, priceStr) + bold0 + LF;
+
+      // Alt qator: miqdor × birlik narxi
+      t += `    ${fmt(item.quantity)} x ${fmt(item.unitPrice)} sum` + LF;
+
+      // Mahsulotlar orasida nuqtali chiziq (oxirgisidan keyin yo'q)
+      if (idx < d.items.length - 1) {
+        t += dotted + LF;
+      }
     });
 
     // ─── JAMI ────────────────────────────────────
-    t += dash + LF;
-    t += rowLR("Yig'indi:", fmt(d.subtotal)) + LF;
+    t += SEP + LF;
+    t += rowLR("Yig'indi:", `${fmt(d.subtotal)}`) + LF;
     if (d.discount > 0) {
       const pct =
         d.subtotal > 0
           ? ` (${Math.round((d.discount / d.subtotal) * 100)}%)`
           : '';
       t += rowLR(`Chegirma${pct}:`, `-${fmt(d.discount)}`) + LF;
-      t += dash + LF;
     }
+    t += dash + LF;
     t += bold1 + rowLR("TO'LOV:", `${fmt(d.total)} sum`) + bold0 + LF;
     t += SEP + LF;
 
