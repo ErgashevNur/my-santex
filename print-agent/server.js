@@ -2,6 +2,7 @@ const express = require('express');
 const cors = require('cors');
 const fs = require('fs');
 const fsp = require('fs/promises');
+const net = require('net');
 const { exec } = require('child_process');
 const os = require('os');
 const path = require('path');
@@ -10,6 +11,8 @@ const app = express();
 const PORT = process.env.PRINT_AGENT_PORT || 5555;
 const WIDTH = parseInt(process.env.PRINTER_WIDTH || '48', 10);
 const IS_WINDOWS = os.platform() === 'win32';
+const PRINTER_IP = process.env.PRINTER_IP || '';
+const PRINTER_PORT_NET = parseInt(process.env.PRINTER_PORT || '9100', 10);
 
 const USB_CANDIDATES = ['/dev/usb/lp0', '/dev/usb/lp1', '/dev/usb/lp2', '/dev/usb/lp3'];
 
@@ -25,23 +28,26 @@ app.use(express.json());
 
 // ── Status ───────────────────────────────────────────────────────────────────
 app.get('/status', (req, res) => {
+  if (PRINTER_IP) {
+    return res.json({ ok: true, mode: 'network', host: PRINTER_IP, port: PRINTER_PORT_NET });
+  }
   if (IS_WINDOWS) {
     const printerName = process.env.PRINTER_NAME || 'XP-80';
-    return res.json({ ok: true, platform: 'windows', printer: printerName });
+    return res.json({ ok: true, mode: 'windows', printer: printerName });
   }
   const devices = {};
   for (const d of USB_CANDIDATES) {
     devices[d] = fs.existsSync(d) ? 'TOPILDI' : "YO'Q";
   }
   const found = Object.entries(devices).find(([, v]) => v === 'TOPILDI')?.[0] || null;
-  res.json({ ok: true, platform: 'linux', printer: found ? 'ULANGAN' : "ULANMAGAN", device: found, devices });
+  res.json({ ok: true, mode: 'linux-usb', printer: found ? 'ULANGAN' : "ULANMAGAN", device: found, devices });
 });
 
 // ── Cut only ─────────────────────────────────────────────────────────────────
 app.post('/cut', async (req, res) => {
   const GS = '\x1D';
-  // 3 qator feed + partial cut
   const buf = Buffer.from('\n\n\n' + `${GS}\x56\x41\x00`, 'latin1');
+  if (PRINTER_IP) return sendNetwork(buf, res);
   if (IS_WINDOWS) return sendWindows(buf, res);
   return sendLinux(buf, res);
 });
@@ -53,6 +59,7 @@ app.post('/print', async (req, res) => {
     return res.status(400).json({ ok: false, error: "Sale data yo'q" });
   }
   const buf = buildReceipt(sale);
+  if (PRINTER_IP) return sendNetwork(buf, res);
   if (IS_WINDOWS) return sendWindows(buf, res);
   return sendLinux(buf, res);
 });
@@ -154,6 +161,28 @@ public class RawPrint {
         }
       );
     });
+  });
+}
+
+// ── Network: TCP socket orqali (Linux ham, Windows ham) ──────────────────────
+function sendNetwork(buf, res) {
+  const client = new net.Socket();
+  const timer = setTimeout(() => {
+    client.destroy();
+    res.status(500).json({ ok: false, error: `Printer ulanmadi: ${PRINTER_IP}:${PRINTER_PORT_NET}` });
+  }, 5000);
+
+  client.connect(PRINTER_PORT_NET, PRINTER_IP, () => {
+    client.write(buf, () => {
+      clearTimeout(timer);
+      client.destroy();
+      console.log(`[print-agent] Chek yuborildi → ${PRINTER_IP}:${PRINTER_PORT_NET}`);
+      res.json({ ok: true, host: PRINTER_IP, port: PRINTER_PORT_NET });
+    });
+  });
+  client.on('error', (err) => {
+    clearTimeout(timer);
+    res.status(500).json({ ok: false, error: `Network printer xato: ${err.message}` });
   });
 }
 
