@@ -255,7 +255,6 @@ export default function LoginPage() {
     })
   }
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
       if (e.metaKey || e.ctrlKey || e.altKey) return
@@ -265,6 +264,7 @@ export default function LoginPage() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleFaceSuccess = async (descriptor: number[]) => {

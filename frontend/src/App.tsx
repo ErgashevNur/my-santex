@@ -24,12 +24,12 @@ const queryClient = new QueryClient({
 function AppContent() {
   const { loadUser, logout } = useAuthStore()
 
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => {
     loadUser()
     const handler = () => logout()
     window.addEventListener('auth:logout', handler)
     return () => window.removeEventListener('auth:logout', handler)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   return (

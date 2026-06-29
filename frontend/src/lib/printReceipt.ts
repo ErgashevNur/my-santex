@@ -24,7 +24,7 @@ export function printReceipt(sale: ReceiptSale) {
   const store = sale.store || {};
   const user = sale.user || {};
 
-  const dt = new Date(sale.createdAt);
+  const dt = new Date(sale.createdAt ?? '');
   const pad = (n: number) => String(n).padStart(2, '0');
   const dateStr = `${pad(dt.getDate())}.${pad(dt.getMonth() + 1)}.${dt.getFullYear()}`;
   const timeStr = `${pad(dt.getHours())}:${pad(dt.getMinutes())}`;
@@ -88,7 +88,7 @@ ${itemsHtml}
 <div class="row"><span>Jami:</span><span>${money(subtotal)}</span></div>
 ${discount > 0 ? `<div class="row"><span>Chegirma:</span><span>-${money(discount)}</span></div><div class="sep"></div>` : ''}
 <div class="row total-row"><span>TO'LASH:</span><span>${money(Number(sale.totalAmount))}</span></div>
-<div class="row"><span>To'lov:</span><span class="bold">${PAYMENT_LABELS[sale.paymentMethod] || sale.paymentMethod}</span></div>
+<div class="row"><span>To'lov:</span><span class="bold">${PAYMENT_LABELS[sale.paymentMethod ?? ''] || sale.paymentMethod}</span></div>
 <div class="sep"></div>
 <div class="center bold thanks">Xarid uchun rahmat!</div>
 <br><br><br>

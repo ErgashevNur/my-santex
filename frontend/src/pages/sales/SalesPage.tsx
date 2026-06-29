@@ -25,7 +25,7 @@ interface CartItem {
   unitPrice: number
 }
 
-interface SaleProduct { id: string; name: string; sellPrice: number; stock: number }
+interface SaleProduct { id: string; name: string; sellPrice: number; stock: number; barcode?: string }
 interface HistorySale {
   id: string; receiptNo: number; totalAmount: number; createdAt: string
   paymentMethod: string; customerName?: string

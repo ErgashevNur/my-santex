@@ -177,7 +177,7 @@ export default function AdminStoresPage() {
       {/* ── Obuna ── */}
       <Modal open={!!subscriptionModal} onClose={() => setSubscriptionModal(null)} title="Obuna holati" size="sm">
         <form
-          onSubmit={e => { e.preventDefault(); subMutation.mutate({ id: subscriptionModal?.id, data: subForm }) }}
+          onSubmit={e => { e.preventDefault(); subMutation.mutate({ id: subscriptionModal!.id, data: subForm }) }}
           className="space-y-4"
         >
           <Select label="Holat" value={subForm.status}

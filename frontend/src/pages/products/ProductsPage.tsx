@@ -258,7 +258,7 @@ export default function ProductsPage() {
       <Modal open={stockModalOpen} onClose={() => setStockModalOpen(false)} title="Zaxira qo'shish" size="sm">
         <div className="space-y-4">
           <p className="text-sm text-slate-600">
-            <span className="font-medium">{editProduct?.name}</span> — mavjud: {Number(editProduct?.stock)} {unitLabels[editProduct?.unit]}
+            <span className="font-medium">{editProduct?.name}</span> — mavjud: {Number(editProduct?.stock)} {unitLabels[editProduct?.unit ?? '']}
           </p>
           <Input
             label="Qo'shiladigan miqdor"
@@ -271,7 +271,7 @@ export default function ProductsPage() {
             <Button variant="secondary" onClick={() => setStockModalOpen(false)}>Bekor</Button>
             <Button
               loading={addStockMutation.isPending}
-              onClick={() => addStockMutation.mutate({ id: editProduct?.id, quantity: Number(addQty) })}
+              onClick={() => addStockMutation.mutate({ id: editProduct!.id, quantity: Number(addQty) })}
               disabled={!addQty || Number(addQty) <= 0}
             >
               Qo'shish

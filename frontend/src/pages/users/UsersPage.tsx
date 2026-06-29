@@ -81,7 +81,7 @@ export default function UsersPage() {
         {isLoading ? (
           <p className="col-span-3 text-center text-slate-400 py-12">Yuklanmoqda...</p>
         ) : (
-          (users as { id: string; name: string; email?: string; phone?: string; role: string; isActive: boolean }[]).map((u) => (
+          (users as { id: string; name: string; email?: string; phone?: string; role: string; isActive: boolean; store?: { name: string } }[]).map((u) => (
             <Card key={u.id}>
               <div className="flex items-start justify-between mb-3">
                 <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center text-blue-600 font-semibold text-sm">
@@ -166,7 +166,7 @@ export default function UsersPage() {
             <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2 mb-4">
               Bu ma'lumotlar maxfiy. Faqat Super Admin ko'rishi mumkin.
             </p>
-            {(allUsers as { id: string; name: string; role: string; pin?: string }[]).map((u) => (
+            {(allUsers as { id: string; name: string; role: string; pin?: string; store?: { name: string } }[]).map((u) => (
               <div
                 key={u.id}
                 className="flex items-center justify-between gap-2 p-3 rounded-lg border border-slate-100 bg-slate-50"
