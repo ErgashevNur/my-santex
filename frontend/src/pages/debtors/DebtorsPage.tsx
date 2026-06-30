@@ -3,7 +3,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { useNavigate } from 'react-router-dom'
 import { debtorsApi } from '../../api/debtors'
 import { formatCurrency } from '../../lib/utils'
-import { Search, X, UserPlus, Phone, ChevronRight } from 'lucide-react'
+import { Search, X, UserPlus, Phone, ChevronRight, Users, TrendingDown } from 'lucide-react'
 
 function today() {
   return new Date().toISOString().slice(0, 10)
@@ -11,7 +11,7 @@ function today() {
 
 function fmtDate(iso: string) {
   const d = new Date(iso)
-  return `${String(d.getDate()).padStart(2,'0')}.${String(d.getMonth()+1).padStart(2,'0')}.${d.getFullYear()}`
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`
 }
 
 export default function DebtorsPage() {
@@ -65,17 +65,31 @@ export default function DebtorsPage() {
   return (
     <div className="flex flex-col min-h-screen bg-slate-50">
 
-      {/* Yuqori statistika */}
-      <div className="bg-red-600 px-4 pt-5 pb-8">
-        <h1 className="text-white font-bold text-lg mb-3">Qarzdorlar</h1>
-        <div className="flex gap-3">
-          <div className="flex-1 bg-white/15 rounded-2xl p-3 text-center">
-            <p className="text-red-100 text-xs mb-1">Umumiy qarz</p>
-            <p className="text-white font-bold text-lg leading-tight">{formatCurrency(totalDebt)}</p>
+      {/* Qizil header */}
+      <div className="bg-red-600 px-4 pt-5 pb-16">
+        <h1 className="text-white font-bold text-xl mb-4">Qarzdorlar</h1>
+
+        <div className="grid grid-cols-2 gap-3">
+          {/* Umumiy qarz */}
+          <div className="bg-white/15 rounded-2xl p-3.5">
+            <div className="flex items-center gap-2 mb-1">
+              <TrendingDown size={14} className="text-red-200" />
+              <p className="text-red-100 text-xs font-medium">Umumiy qarz</p>
+            </div>
+            <p className="text-white font-bold text-lg leading-tight">
+              {formatCurrency(totalDebt)}
+            </p>
           </div>
-          <div className="flex-1 bg-white/15 rounded-2xl p-3 text-center">
-            <p className="text-red-100 text-xs mb-1">Qarzdorlar</p>
-            <p className="text-white font-bold text-lg leading-tight">{totalCount} ta</p>
+
+          {/* Qarzdorlar soni */}
+          <div className="bg-white/15 rounded-2xl p-3.5">
+            <div className="flex items-center gap-2 mb-1">
+              <Users size={14} className="text-red-200" />
+              <p className="text-red-100 text-xs font-medium">Qarzdorlar</p>
+            </div>
+            <p className="text-white font-bold text-lg leading-tight">
+              {totalCount} <span className="text-red-200 font-normal text-sm">ta</span>
+            </p>
           </div>
         </div>
       </div>
@@ -86,18 +100,26 @@ export default function DebtorsPage() {
         {/* Qidiruv + Qo'shish */}
         <div className="flex gap-2">
           <div className="relative flex-1">
-            <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" />
+            <Search size={15} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-slate-400" />
             <input
               type="text"
               placeholder="Ism yoki telefon..."
               value={search}
               onChange={e => setSearch(e.target.value)}
-              className="w-full pl-9 pr-3 py-2.5 border border-slate-200 rounded-xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400"
+              className="w-full pl-10 pr-9 py-3 border border-slate-200 rounded-2xl text-sm bg-white focus:outline-none focus:ring-2 focus:ring-red-400"
             />
+            {search && (
+              <button
+                onClick={() => setSearch('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 p-0.5"
+              >
+                <X size={14} />
+              </button>
+            )}
           </div>
           <button
             onClick={() => setShowForm(true)}
-            className="flex items-center gap-1.5 bg-red-600 text-white px-4 py-2.5 rounded-xl text-sm font-semibold hover:bg-red-700 active:scale-95 transition-all whitespace-nowrap"
+            className="flex items-center gap-1.5 bg-red-600 text-white px-4 py-3 rounded-2xl text-sm font-semibold active:scale-95 transition-all whitespace-nowrap"
           >
             <UserPlus size={16} />
             Qo'shish
@@ -106,71 +128,102 @@ export default function DebtorsPage() {
 
         {/* Ro'yxat */}
         {isLoading ? (
-          <div className="text-center py-20 text-slate-400">Yuklanmoqda...</div>
+          <div className="space-y-2">
+            {[1, 2, 3, 4].map(i => (
+              <div key={i} className="bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3 border border-slate-100 animate-pulse">
+                <div className="w-11 h-11 rounded-full bg-slate-100 flex-shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-slate-100 rounded w-28" />
+                  <div className="h-3 bg-slate-100 rounded w-20" />
+                </div>
+                <div className="h-4 bg-slate-100 rounded w-16" />
+              </div>
+            ))}
+          </div>
         ) : filtered.length === 0 ? (
-          <div className="text-center py-20 text-slate-400">
-            {search ? 'Topilmadi' : 'Hali qarzdor yo\'q'}
+          <div className="bg-white rounded-2xl p-10 text-center border border-slate-100">
+            <p className="text-4xl mb-2">{search ? '🔍' : '👤'}</p>
+            <p className="text-slate-400 text-sm">
+              {search ? 'Topilmadi' : 'Hali qarzdor yo\'q'}
+            </p>
+            {!search && (
+              <button
+                onClick={() => setShowForm(true)}
+                className="mt-3 text-red-600 text-sm font-semibold"
+              >
+                Birinchi qarzdorni qo'shish
+              </button>
+            )}
           </div>
         ) : (
           <div className="space-y-2">
-            {filtered.map((debtor) => (
-              <button
-                key={debtor.id}
-                onClick={() => navigate(`/debtors/${debtor.id}`)}
-                className="w-full bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3 shadow-sm active:scale-98 transition-all text-left border border-slate-100"
-              >
-                {/* Avatar */}
-                <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                  <span className="text-red-600 font-bold text-base">
-                    {debtor.name.charAt(0).toUpperCase()}
-                  </span>
-                </div>
+            {filtered.map((debtor) => {
+              const debt = Number(debtor.totalDebt)
+              const isInDebt = debt > 0
+              return (
+                <button
+                  key={debtor.id}
+                  onClick={() => navigate(`/debtors/${debtor.id}`)}
+                  className="w-full bg-white rounded-2xl px-4 py-3.5 flex items-center gap-3 border border-slate-100 active:scale-98 transition-all text-left"
+                >
+                  {/* Avatar */}
+                  <div className={`w-11 h-11 rounded-full flex items-center justify-center flex-shrink-0 ${isInDebt ? 'bg-red-100' : 'bg-green-100'}`}>
+                    <span className={`font-bold text-base ${isInDebt ? 'text-red-600' : 'text-green-600'}`}>
+                      {debtor.name.charAt(0).toUpperCase()}
+                    </span>
+                  </div>
 
-                {/* Ma'lumot */}
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-slate-800 truncate">{debtor.name}</p>
-                    <p className={`font-bold text-sm flex-shrink-0 ${Number(debtor.totalDebt) > 0 ? 'text-red-600' : 'text-green-600'}`}>
-                      {formatCurrency(Number(debtor.totalDebt))}
+                  {/* Ma'lumot */}
+                  <div className="flex-1 min-w-0">
+                    <p className="font-semibold text-slate-800 truncate text-sm">{debtor.name}</p>
+                    <div className="flex items-center gap-2 mt-0.5">
+                      {debtor.phone ? (
+                        <span className="text-xs text-slate-400 flex items-center gap-1">
+                          <Phone size={10} />{debtor.phone}
+                        </span>
+                      ) : (
+                        <span className="text-xs text-slate-300">{fmtDate(debtor.createdAt)}</span>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Summa + chevron */}
+                  <div className="flex items-center gap-1.5 flex-shrink-0">
+                    <p className={`font-bold text-sm ${isInDebt ? 'text-red-600' : 'text-green-600'}`}>
+                      {formatCurrency(debt)}
                     </p>
+                    <ChevronRight size={15} className="text-slate-300" />
                   </div>
-                  <div className="flex items-center gap-3 mt-0.5">
-                    {debtor.phone ? (
-                      <span className="text-xs text-slate-400 flex items-center gap-1">
-                        <Phone size={10} />{debtor.phone}
-                      </span>
-                    ) : (
-                      <span className="text-xs text-slate-300">—</span>
-                    )}
-                    <span className="text-xs text-slate-300">{fmtDate(debtor.createdAt)}</span>
-                  </div>
-                </div>
-
-                <ChevronRight size={16} className="text-slate-300 flex-shrink-0" />
-              </button>
-            ))}
+                </button>
+              )
+            })}
 
             {/* Jami */}
-            <div className="bg-slate-100 rounded-2xl px-4 py-3 flex justify-between items-center">
-              <span className="text-sm font-medium text-slate-600">Jami qarz</span>
-              <span className="font-bold text-red-600">
-                {formatCurrency(filtered.reduce((s, d) => s + Number(d.totalDebt), 0))}
-              </span>
-            </div>
+            {filtered.length > 1 && (
+              <div className="bg-slate-100 rounded-2xl px-4 py-3 flex justify-between items-center">
+                <span className="text-sm font-medium text-slate-500">
+                  {filtered.length} ta qarzdor jami
+                </span>
+                <span className="font-bold text-red-600">
+                  {formatCurrency(filtered.reduce((s, d) => s + Number(d.totalDebt), 0))}
+                </span>
+              </div>
+            )}
           </div>
         )}
       </div>
 
-      {/* Modal */}
+      {/* Modal — yangi qarzdor qo'shish */}
       {showForm && (
         <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={closeForm}>
           <div
-            className="w-full bg-white rounded-t-3xl px-5 pt-5 pb-8 space-y-4"
+            className="w-full bg-white rounded-t-3xl px-5 pt-4 pb-8 space-y-4"
             onClick={e => e.stopPropagation()}
           >
-            {/* Handle */}
+            {/* Drag handle */}
             <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
 
+            {/* Sarlavha */}
             <div className="flex items-center justify-between">
               <h3 className="font-bold text-lg text-slate-800">Yangi qarzdor</h3>
               <button onClick={closeForm} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
@@ -179,6 +232,7 @@ export default function DebtorsPage() {
             </div>
 
             <div className="space-y-3">
+              {/* Ismi */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">
                   ISMI <span className="text-red-500">*</span>
@@ -193,6 +247,7 @@ export default function DebtorsPage() {
                 />
               </div>
 
+              {/* Qarz summasi */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">
                   QARZ SUMMASI <span className="text-red-500">*</span>
@@ -207,6 +262,7 @@ export default function DebtorsPage() {
                 />
               </div>
 
+              {/* Sana + Telefon */}
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 mb-1.5">SANA</label>
@@ -229,6 +285,7 @@ export default function DebtorsPage() {
                 </div>
               </div>
 
+              {/* Izoh */}
               <div>
                 <label className="block text-xs font-semibold text-slate-500 mb-1.5">IZOH</label>
                 <input
@@ -244,7 +301,7 @@ export default function DebtorsPage() {
             <button
               disabled={!name.trim() || !amount || Number(amount) <= 0 || createWithDebt.isPending}
               onClick={() => createWithDebt.mutate()}
-              className="w-full py-4 bg-red-600 text-white rounded-2xl font-semibold hover:bg-red-700 disabled:opacity-50 active:scale-98 transition-all"
+              className="w-full py-4 bg-red-600 text-white rounded-2xl font-semibold disabled:opacity-50 active:scale-98 transition-all"
             >
               {createWithDebt.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
             </button>
