@@ -1,3 +1,16 @@
+double _d(dynamic v, {double def = 0}) {
+  if (v == null) return def;
+  if (v is num) return v.toDouble();
+  return double.tryParse(v.toString()) ?? def;
+}
+
+int _i(dynamic v, {int def = 0}) {
+  if (v == null) return def;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString()) ?? def;
+}
+
 const Map<String, String> paymentLabels = {
   'CASH': 'Naqd',
   'CARD': 'Karta',
@@ -26,9 +39,9 @@ class SaleItem {
         id: j['id'] ?? '',
         productId: j['productId'] ?? '',
         productName: j['product']?['name'] ?? j['productName'] ?? '',
-        quantity: (j['quantity'] as num?)?.toDouble() ?? 0,
-        unitPrice: (j['unitPrice'] as num?)?.toDouble() ?? 0,
-        totalPrice: (j['totalPrice'] as num?)?.toDouble() ?? 0,
+        quantity: _d(j['quantity']),
+        unitPrice: _d(j['unitPrice']),
+        totalPrice: _d(j['totalPrice']),
       );
 }
 
@@ -39,6 +52,7 @@ class Sale {
   final String paymentMethod;
   final String? customerName;
   final String createdAt;
+  final double discountAmount;
   final Map<String, dynamic>? user;
   final List<SaleItem> items;
 
@@ -49,17 +63,19 @@ class Sale {
     required this.paymentMethod,
     this.customerName,
     required this.createdAt,
+    this.discountAmount = 0,
     this.user,
     this.items = const [],
   });
 
   factory Sale.fromJson(Map<String, dynamic> j) => Sale(
         id: j['id'] ?? '',
-        receiptNo: j['receiptNo'] ?? 0,
-        totalAmount: (j['totalAmount'] as num?)?.toDouble() ?? 0,
+        receiptNo: _i(j['receiptNo']),
+        totalAmount: _d(j['totalAmount']),
         paymentMethod: j['paymentMethod'] ?? 'CASH',
         customerName: j['customerName'],
         createdAt: j['createdAt'] ?? DateTime.now().toIso8601String(),
+        discountAmount: _d(j['discountAmount']),
         user: j['user'],
         items: (j['items'] as List<dynamic>?)
                 ?.map((e) => SaleItem.fromJson(e))
@@ -84,12 +100,16 @@ class SalesStats {
   });
 
   factory SalesStats.fromJson(Map<String, dynamic> j) => SalesStats(
-        todayRevenue: (j['today']?['revenue'] as num?)?.toDouble() ?? 0,
-        todaySalesCount: j['today']?['salesCount'] ?? 0,
-        weekRevenue: (j['week']?['revenue'] as num?)?.toDouble() ?? 0,
-        weekSalesCount: j['week']?['salesCount'] ?? 0,
-        topProductName: (j['topProducts'] as List?)?.isNotEmpty == true
-            ? j['topProducts'][0]['product']?['name']
-            : null,
+        todayRevenue: _d(j['today']?['revenue']),
+        todaySalesCount: _i(j['today']?['salesCount']),
+        weekRevenue: _d(j['week']?['revenue']),
+        weekSalesCount: _i(j['week']?['salesCount']),
+        topProductName: (() {
+          final list = j['topProducts'] as List?;
+          if (list == null || list.isEmpty) return null;
+          final prod = list[0]['product'];
+          if (prod == null) return null;
+          return prod['name'] as String?;
+        })(),
       );
 }

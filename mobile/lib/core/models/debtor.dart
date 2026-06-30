@@ -1,3 +1,16 @@
+double _d(dynamic v, {double def = 0}) {
+  if (v == null) return def;
+  if (v is num) return v.toDouble();
+  return double.tryParse(v.toString()) ?? def;
+}
+
+int _i(dynamic v, {int def = 0}) {
+  if (v == null) return def;
+  if (v is int) return v;
+  if (v is num) return v.toInt();
+  return int.tryParse(v.toString()) ?? def;
+}
+
 class DebtTransaction {
   final String id;
   final String type;
@@ -16,7 +29,7 @@ class DebtTransaction {
   factory DebtTransaction.fromJson(Map<String, dynamic> j) => DebtTransaction(
         id: j['id'] ?? '',
         type: j['type'] ?? 'DEBT',
-        amount: (j['amount'] as num?)?.toDouble() ?? 0,
+        amount: _d(j['amount']),
         note: j['note'],
         createdAt: j['createdAt'] ?? DateTime.now().toIso8601String(),
       );
@@ -45,7 +58,7 @@ class Debtor {
         id: j['id'] ?? '',
         name: j['name'] ?? '',
         phone: j['phone'],
-        totalDebt: (j['totalDebt'] as num?)?.toDouble() ?? 0,
+        totalDebt: _d(j['totalDebt']),
         createdAt: j['createdAt'] ?? DateTime.now().toIso8601String(),
         transactions: (j['transactions'] as List<dynamic>?)
                 ?.map((e) => DebtTransaction.fromJson(e))
@@ -64,7 +77,7 @@ class DebtorSummary {
   DebtorSummary({required this.totalDebt, required this.totalCount});
 
   factory DebtorSummary.fromJson(Map<String, dynamic> j) => DebtorSummary(
-        totalDebt: (j['_sum']?['totalDebt'] as num?)?.toDouble() ?? 0,
-        totalCount: j['_count']?['id'] ?? 0,
+        totalDebt: _d(j['_sum']?['totalDebt']),
+        totalCount: _i(j['_count']?['id']),
       );
 }

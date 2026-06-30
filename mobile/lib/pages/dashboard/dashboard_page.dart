@@ -7,6 +7,7 @@ import '../../core/models/product.dart';
 import '../../core/theme/app_theme.dart';
 import '../../providers/auth_provider.dart';
 import '../../utils/formatters.dart';
+import '../../widgets/shimmer_box.dart';
 
 final _statsProvider = FutureProvider<SalesStats>((ref) => ref.read(salesApiProvider).getStats());
 final _recentSalesProvider = FutureProvider<List<Sale>>((ref) => ref.read(salesApiProvider).getAll());
@@ -213,7 +214,7 @@ class _ProductRow extends StatelessWidget {
             ]),
           ),
           RichText(text: TextSpan(children: [
-            TextSpan(text: '${product.stock.toStringAsFixed(product.stock == product.stock.truncate() ? 0 : 1)}',
+            TextSpan(text: product.stock.toStringAsFixed(product.stock == product.stock.truncateToDouble() ? 0 : 1),
                 style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.red, fontSize: 14)),
             TextSpan(text: ' / ${product.minStock.toInt()}',
                 style: const TextStyle(color: AppColors.slate400, fontSize: 12)),
@@ -280,7 +281,7 @@ class _SkeletonGrid extends StatelessWidget {
       physics: const NeverScrollableScrollPhysics(),
       crossAxisSpacing: 12, mainAxisSpacing: 12,
       childAspectRatio: 1.4,
-      children: List.generate(4, (_) => _SkeletonCard(height: 90)),
+      children: List.generate(4, (_) => ShimmerBox(height: 90, radius: 16)),
     );
   }
 }
@@ -289,12 +290,7 @@ class _SkeletonCard extends StatelessWidget {
   final double height;
   const _SkeletonCard({required this.height});
   @override
-  Widget build(BuildContext context) {
-    return Container(
-      height: height,
-      decoration: BoxDecoration(color: AppColors.slate100, borderRadius: BorderRadius.circular(16)),
-    );
-  }
+  Widget build(BuildContext context) => ShimmerBox(height: height, radius: 16);
 }
 
 class _ErrorCard extends StatelessWidget {
@@ -310,6 +306,3 @@ class _ErrorCard extends StatelessWidget {
   }
 }
 
-extension on double {
-  double get truncate => toInt().toDouble();
-}

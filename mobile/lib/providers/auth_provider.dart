@@ -33,12 +33,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }
 
   Future<void> _initialize() async {
-    final token = await getToken();
-    if (token == null) {
-      state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
-      return;
-    }
     try {
+      final token = await getToken().timeout(const Duration(seconds: 10));
+      if (token == null) {
+        state = state.copyWith(status: AuthStatus.unauthenticated, clearUser: true);
+        return;
+      }
       final user = await _api.getProfile();
       state = state.copyWith(status: AuthStatus.authenticated, user: user);
     } catch (_) {

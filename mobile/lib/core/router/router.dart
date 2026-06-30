@@ -25,7 +25,7 @@ final routerProvider = Provider<GoRouter>((ref) {
       final isAuth = authState.status == AuthStatus.authenticated;
       final isLoginPage = state.matchedLocation == '/login';
 
-      if (isInitializing) return '/splash';
+      if (isInitializing && !isLoginPage) return '/login';
       if (!isAuth && !isLoginPage) return '/login';
       if (isAuth && isLoginPage) {
         final user = authState.user;
@@ -36,44 +36,104 @@ final routerProvider = Provider<GoRouter>((ref) {
       return null;
     },
     routes: [
-      GoRoute(path: '/splash', builder: (_, __) => const _SplashPage()),
-      GoRoute(path: '/login', builder: (_, __) => const LoginPage()),
+      GoRoute(path: '/splash', pageBuilder: (_, s) => _fade(s, const _SplashPage())),
+      GoRoute(path: '/login', pageBuilder: (_, s) => _fade(s, const LoginPage())),
       ShellRoute(
         builder: (context, state, child) => AppShell(child: child),
         routes: [
-          GoRoute(path: '/dashboard', builder: (_, __) => const DashboardPage()),
-          GoRoute(path: '/products', builder: (_, __) => const ProductsPage()),
-          GoRoute(path: '/sales', builder: (_, __) => const SalesPage()),
-          GoRoute(path: '/users', builder: (_, __) => const UsersPage()),
-          GoRoute(path: '/debtors', builder: (_, __) => const DebtorsPage()),
+          GoRoute(path: '/dashboard', pageBuilder: (_, s) => _fade(s, const DashboardPage())),
+          GoRoute(path: '/products', pageBuilder: (_, s) => _fade(s, const ProductsPage())),
+          GoRoute(path: '/sales', pageBuilder: (_, s) => _fade(s, const SalesPage())),
+          GoRoute(path: '/users', pageBuilder: (_, s) => _fade(s, const UsersPage())),
+          GoRoute(path: '/debtors', pageBuilder: (_, s) => _fade(s, const DebtorsPage())),
           GoRoute(
             path: '/debtors/:id',
-            builder: (_, state) => DebtorDetailPage(id: state.pathParameters['id']!),
+            pageBuilder: (_, s) => _slide(s, DebtorDetailPage(id: s.pathParameters['id']!)),
           ),
-          GoRoute(path: '/admin', builder: (_, __) => const AdminDashboardPage()),
-          GoRoute(path: '/admin/stores', builder: (_, __) => const AdminStoresPage()),
-          GoRoute(path: '/admin/notifications', builder: (_, __) => const AdminNotificationsPage()),
+          GoRoute(path: '/admin', pageBuilder: (_, s) => _fade(s, const AdminDashboardPage())),
+          GoRoute(path: '/admin/stores', pageBuilder: (_, s) => _fade(s, const AdminStoresPage())),
+          GoRoute(path: '/admin/notifications', pageBuilder: (_, s) => _fade(s, const AdminNotificationsPage())),
         ],
       ),
     ],
   );
 });
 
+CustomTransitionPage<void> _fade(GoRouterState s, Widget child) =>
+    CustomTransitionPage<void>(
+      key: s.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 220),
+      transitionsBuilder: (_, animation, _, child) => FadeTransition(
+        opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+        child: child,
+      ),
+    );
+
+CustomTransitionPage<void> _slide(GoRouterState s, Widget child) =>
+    CustomTransitionPage<void>(
+      key: s.pageKey,
+      child: child,
+      transitionDuration: const Duration(milliseconds: 280),
+      transitionsBuilder: (_, animation, secondary, child) {
+        final tween = Tween(begin: const Offset(1.0, 0.0), end: Offset.zero)
+            .chain(CurveTween(curve: Curves.easeOutCubic));
+        return SlideTransition(
+          position: animation.drive(tween),
+          child: FadeTransition(
+            opacity: CurvedAnimation(parent: animation, curve: Curves.easeOut),
+            child: child,
+          ),
+        );
+      },
+    );
+
 class _SplashPage extends StatelessWidget {
   const _SplashPage();
   @override
   Widget build(BuildContext context) {
     return const Scaffold(
-      body: Center(child: CircularProgressIndicator()),
+      backgroundColor: Color(0xFF2563EB),
+      body: Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.store_outlined, size: 72, color: Colors.white),
+            SizedBox(height: 16),
+            Text(
+              'My Santex',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 28,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+              ),
+            ),
+            SizedBox(height: 8),
+            Text(
+              'Sotuv va Ombor Tizimi',
+              style: TextStyle(color: Color(0xFFBFDBFE), fontSize: 14),
+            ),
+            SizedBox(height: 48),
+            SizedBox(
+              width: 24,
+              height: 24,
+              child: CircularProgressIndicator(
+                strokeWidth: 2.5,
+                valueColor: AlwaysStoppedAnimation<Color>(Colors.white70),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
 
 class GoRouterRefreshStream extends ChangeNotifier {
   final Ref _ref;
-  final AuthNotifier _notifier;
 
-  GoRouterRefreshStream(this._ref, this._notifier) {
-    _ref.listen(authProvider, (_, __) => notifyListeners());
+  GoRouterRefreshStream(this._ref, AuthNotifier _) {
+    _ref.listen(authProvider, (_, _) => notifyListeners());
   }
 }

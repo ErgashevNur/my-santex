@@ -94,7 +94,9 @@ class _LoginPageState extends ConsumerState<LoginPage>
 
   @override
   Widget build(BuildContext context) {
-    final isLoading = ref.watch(authProvider).isLoading;
+    final authState = ref.watch(authProvider);
+    final isLoading = authState.isLoading;
+    final isInitializing = authState.status == AuthStatus.initializing;
     final size = MediaQuery.of(context).size;
 
     return Scaffold(
@@ -123,6 +125,28 @@ class _LoginPageState extends ConsumerState<LoginPage>
             top: size.height * 0.3, left: size.width * 0.2,
             child: _Blob(size: 200, color: const Color(0xFF8B5CF6).withOpacity(0.08)),
           ),
+          // Initializing banner
+          if (isInitializing)
+            Positioned(
+              top: 0, left: 0, right: 0,
+              child: SafeArea(
+                child: Container(
+                  padding: const EdgeInsets.symmetric(vertical: 8),
+                  color: AppColors.primary.withOpacity(0.15),
+                  child: const Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      SizedBox(
+                        width: 12, height: 12,
+                        child: CircularProgressIndicator(strokeWidth: 1.5, color: AppColors.primary),
+                      ),
+                      SizedBox(width: 8),
+                      Text('Sessiya tekshirilmoqda...', style: TextStyle(fontSize: 12, color: AppColors.primary)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           // Content
           SafeArea(
             child: Center(

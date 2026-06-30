@@ -1,17 +1,29 @@
+import 'dart:io';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 const String kBaseUrl = 'https://mysantex.uz/api';
-const _storage = FlutterSecureStorage();
+// encryptedSharedPreferences: false — Samsung Keystore slowness fix
+const _storage = FlutterSecureStorage(
+  aOptions: AndroidOptions(encryptedSharedPreferences: false),
+);
 
 Dio buildDio() {
   final dio = Dio(BaseOptions(
     baseUrl: kBaseUrl,
-    connectTimeout: const Duration(seconds: 15),
-    receiveTimeout: const Duration(seconds: 15),
+    connectTimeout: const Duration(seconds: 20),
+    receiveTimeout: const Duration(seconds: 20),
     headers: {'Content-Type': 'application/json'},
   ));
+
+  // SSL sertifikat muammolarini hal qilish (VPS self-signed yoki zanjir xatosi)
+  (dio.httpClientAdapter as IOHttpClientAdapter).createHttpClient = () {
+    final client = HttpClient();
+    client.badCertificateCallback = (cert, host, port) => true;
+    return client;
+  };
 
   dio.interceptors.add(InterceptorsWrapper(
     onRequest: (options, handler) async {
@@ -43,16 +55,29 @@ Future<void> deleteToken() => _storage.delete(key: 'token');
 
 String extractError(dynamic e) {
   if (e is DioException) {
+    // Server javob bergan xato
     final data = e.response?.data;
     if (data is Map && data['message'] != null) {
       final msg = data['message'];
       if (msg is List) return msg.join(', ');
       return msg.toString();
     }
+    // Timeout
     if (e.type == DioExceptionType.connectionTimeout ||
         e.type == DioExceptionType.receiveTimeout) {
-      return 'Server bilan aloqa yo\'q';
+      return 'Server bilan aloqa yo\'q (timeout)';
+    }
+    // Connection error
+    if (e.type == DioExceptionType.connectionError) {
+      return 'Internet aloqa yo\'q yoki server ishlamayapti';
+    }
+    // SSL / boshqa
+    if (e.error != null) {
+      return 'Xatolik: ${e.error.runtimeType} — ${e.message}';
+    }
+    if (e.response?.statusCode != null) {
+      return 'Server xatosi: ${e.response?.statusCode}';
     }
   }
-  return 'Xatolik yuz berdi';
+  return 'Xatolik: ${e.runtimeType} — $e';
 }

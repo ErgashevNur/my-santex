@@ -5,6 +5,7 @@ import '../../core/api/debtors_api.dart';
 import '../../core/api/client.dart';
 import '../../core/models/debtor.dart';
 import '../../core/theme/app_theme.dart';
+import '../../providers/auth_provider.dart';
 import '../../utils/formatters.dart';
 
 final debtorsProvider = FutureProvider<List<Debtor>>(
@@ -43,43 +44,55 @@ class _DebtorsPageState extends ConsumerState<DebtorsPage> {
         },
         child: CustomScrollView(
           slivers: [
-            // Red header
-            SliverAppBar(
-              expandedHeight: 170,
-              pinned: true,
-              backgroundColor: AppColors.red,
-              foregroundColor: AppColors.white,
-              title: const Text('Qarzdorlar', style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w700)),
-              actions: [
-                IconButton(
-                  icon: const Icon(Icons.add, color: AppColors.white),
-                  onPressed: () => _showAddModal(context),
-                ),
-              ],
-              flexibleSpace: FlexibleSpaceBar(
-                background: Container(
-                  color: AppColors.red,
-                  child: Align(
-                    alignment: Alignment.bottomLeft,
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                      child: summary.maybeWhen(
-                        data: (s) => Row(children: [
-                          _SummaryChip(
-                            label: 'Umumiy qarz',
-                            value: formatCurrency(s.totalDebt),
-                            icon: Icons.trending_down,
-                          ),
+            // Red header — fixed layout, no SliverAppBar overlap issues
+            SliverToBoxAdapter(
+              child: Container(
+                color: AppColors.red,
+                child: SafeArea(
+                  bottom: false,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      // Toolbar row
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(4, 4, 4, 0),
+                        child: Row(children: [
                           const SizedBox(width: 12),
-                          _SummaryChip(
-                            label: 'Qarzdorlar',
-                            value: '${s.totalCount} ta',
-                            icon: Icons.people_outlined,
+                          const Expanded(
+                            child: Text('Qarzdorlar',
+                                style: TextStyle(color: AppColors.white, fontWeight: FontWeight.w700, fontSize: 18)),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.add, color: AppColors.white),
+                            onPressed: () => _showAddModal(context),
+                          ),
+                          IconButton(
+                            icon: const Icon(Icons.logout_outlined, color: AppColors.white),
+                            onPressed: () => ref.read(authProvider.notifier).logout(),
                           ),
                         ]),
-                        orElse: () => const SizedBox.shrink(),
                       ),
-                    ),
+                      // Summary chips
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(16, 8, 16, 16),
+                        child: summary.maybeWhen(
+                          data: (s) => Row(children: [
+                            _SummaryChip(
+                              label: 'Umumiy qarz',
+                              value: formatCurrency(s.totalDebt),
+                              icon: Icons.trending_down,
+                            ),
+                            const SizedBox(width: 12),
+                            _SummaryChip(
+                              label: 'Qarzdorlar',
+                              value: '${s.totalCount} ta',
+                              icon: Icons.people_outlined,
+                            ),
+                          ]),
+                          orElse: () => const SizedBox(height: 60),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -169,7 +182,7 @@ class _DebtorsPageState extends ConsumerState<DebtorsPage> {
                         }
                         final d = filtered[i];
                         return Padding(
-                          padding: const EdgeInsets.only(bottom: 8, top: i == 0 ? 8 : 0),
+                          padding: EdgeInsets.only(bottom: 8, top: i == 0 ? 8 : 0),
                           child: _DebtorCard(debtor: d,
                             onTap: () => context.push('/debtors/${d.id}'),
                           ),
@@ -225,13 +238,13 @@ class _SummaryChip extends StatelessWidget {
       child: Container(
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
-          color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(16),
+          color: Colors.white.withValues(alpha: 0.15), borderRadius: BorderRadius.circular(16),
         ),
         child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
           Row(children: [
-            Icon(icon, color: Colors.white.withOpacity(0.7), size: 14),
+            Icon(icon, color: Colors.white.withValues(alpha: 0.7), size: 14),
             const SizedBox(width: 6),
-            Text(label, style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 11)),
+            Text(label, style: TextStyle(color: Colors.white.withValues(alpha: 0.8), fontSize: 11)),
           ]),
           const SizedBox(height: 4),
           Text(value, style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.w700, fontSize: 16)),

@@ -1,3 +1,9 @@
+double _d(dynamic v, {double def = 0}) {
+  if (v == null) return def;
+  if (v is num) return v.toDouble();
+  return double.tryParse(v.toString()) ?? def;
+}
+
 class Category {
   final String id;
   final String name;
@@ -41,10 +47,10 @@ class Product {
         id: j['id'] ?? '',
         name: j['name'] ?? '',
         unit: j['unit'] ?? 'PIECE',
-        costPrice: (j['costPrice'] as num?)?.toDouble() ?? 0,
-        sellPrice: (j['sellPrice'] as num?)?.toDouble() ?? 0,
-        stock: (j['stock'] as num?)?.toDouble() ?? 0,
-        minStock: (j['minStock'] as num?)?.toDouble() ?? 5,
+        costPrice: _d(j['costPrice']),
+        sellPrice: _d(j['sellPrice']),
+        stock: _d(j['stock']),
+        minStock: _d(j['minStock'], def: 5),
         description: j['description'],
         categoryId: j['categoryId'],
         category: j['category'] != null ? Category.fromJson(j['category']) : null,

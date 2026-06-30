@@ -17,7 +17,16 @@ class AppShell extends ConsumerWidget {
     final currentIndex = _currentIndex(location, navItems);
 
     return Scaffold(
-      body: child,
+      body: AnimatedSwitcher(
+        duration: const Duration(milliseconds: 200),
+        switchInCurve: Curves.easeOut,
+        switchOutCurve: Curves.easeIn,
+        transitionBuilder: (child, animation) => FadeTransition(
+          opacity: animation,
+          child: child,
+        ),
+        child: KeyedSubtree(key: ValueKey(location), child: child),
+      ),
       bottomNavigationBar: navItems.isEmpty
           ? null
           : Container(
@@ -65,7 +74,7 @@ class AppShell extends ConsumerWidget {
     );
   }
 
-  List<_NavItem> _buildNavItems(user) {
+  List<_NavItem> _buildNavItems(dynamic user) {
     if (user == null) return [];
     if (user.isSuperAdmin) {
       return [

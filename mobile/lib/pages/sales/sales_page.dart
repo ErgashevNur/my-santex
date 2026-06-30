@@ -1,5 +1,9 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:pdf/pdf.dart';
+import 'package:printing/printing.dart';
+import '../../providers/auth_provider.dart';
 import '../../core/api/sales_api.dart';
 import '../../core/api/products_api.dart';
 import '../../core/api/client.dart';
@@ -7,6 +11,7 @@ import '../../core/models/sale.dart';
 import '../../core/models/product.dart';
 import '../../core/theme/app_theme.dart';
 import '../../utils/formatters.dart';
+import '../../utils/receipt_pdf.dart';
 
 // Cart item model
 class CartItem {
@@ -99,8 +104,11 @@ class _SalesPageState extends ConsumerState<SalesPage> with SingleTickerProvider
   Future<void> _checkout() async {
     if (_cart.isEmpty || _processing) return;
     setState(() => _processing = true);
+    final cartSnapshot = _cart.map((c) => ReceiptItem(
+      name: c.name, quantity: c.quantity, unitPrice: c.unitPrice,
+    )).toList();
     try {
-      await ref.read(salesApiProvider).create(
+      final sale = await ref.read(salesApiProvider).create(
         items: _cart.map((c) => {
           'productId': c.productId,
           'quantity': c.quantity,
@@ -111,9 +119,11 @@ class _SalesPageState extends ConsumerState<SalesPage> with SingleTickerProvider
       setState(() { _cart.clear(); _search = ''; _searchCtrl.clear(); });
       ref.invalidate(_productSearchProvider);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Sotuv muvaffaqiyatli amalga oshirildi ✓'),
-              backgroundColor: AppColors.green),
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (_) => _ReceiptSheet(sale: sale, items: cartSnapshot),
         );
       }
     } catch (e) {
@@ -421,6 +431,175 @@ class _SaleCard extends StatelessWidget {
         Text(formatCurrency(sale.totalAmount),
             style: const TextStyle(fontWeight: FontWeight.w700, color: AppColors.green, fontSize: 14)),
       ]),
+    );
+  }
+}
+
+// ───────── Receipt Bottom Sheet ─────────
+
+class _ReceiptSheet extends ConsumerStatefulWidget {
+  final Sale sale;
+  final List<ReceiptItem> items;
+  const _ReceiptSheet({required this.sale, required this.items});
+  @override
+  ConsumerState<_ReceiptSheet> createState() => _ReceiptSheetState();
+}
+
+class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
+  bool _loading = false;
+
+  Future<Uint8List> _buildPdf({PdfPageFormat? format}) async {
+    final user = ref.read(authProvider).user;
+    return generateReceiptPdf(
+      sale: widget.sale,
+      items: widget.items,
+      storeName: user?.store?.name ?? 'My Santex',
+      storeAddress: user?.store?.address,
+      storePhone: user?.store?.phone,
+      cashierName: user?.name,
+      pageFormat: format,
+    );
+  }
+
+  Future<void> _share() async {
+    setState(() => _loading = true);
+    try {
+      final bytes = await _buildPdf();
+      await Printing.sharePdf(bytes: bytes, filename: 'chek-${widget.sale.receiptNo}.pdf');
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _print() async {
+    setState(() => _loading = true);
+    try {
+      final user = ref.read(authProvider).user;
+      await Printing.layoutPdf(
+        onLayout: (format) => generateReceiptPdf(
+          sale: widget.sale,
+          items: widget.items,
+          storeName: user?.store?.name ?? 'My Santex',
+          storeAddress: user?.store?.address,
+          storePhone: user?.store?.phone,
+          cashierName: user?.name,
+          pageFormat: format,
+        ),
+        name: 'Chek #${widget.sale.receiptNo}',
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppColors.white,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+      ),
+      padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle
+          Center(child: Container(
+            width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
+            decoration: BoxDecoration(color: AppColors.slate200, borderRadius: BorderRadius.circular(2)),
+          )),
+
+          // Success icon
+          Container(
+            width: 56, height: 56,
+            decoration: BoxDecoration(color: AppColors.greenLight, shape: BoxShape.circle),
+            child: const Icon(Icons.check_circle_outline, color: AppColors.green, size: 30),
+          ),
+          const SizedBox(height: 12),
+          const Text('Sotuv amalga oshirildi!',
+              style: TextStyle(fontSize: 17, fontWeight: FontWeight.w700, color: AppColors.slate800)),
+          const SizedBox(height: 4),
+          Text('Chek #${widget.sale.receiptNo} · ${formatCurrency(widget.sale.totalAmount)}',
+              style: const TextStyle(fontSize: 13, color: AppColors.slate400)),
+
+          const SizedBox(height: 20),
+          const Divider(height: 1, color: AppColors.slate100),
+          const SizedBox(height: 16),
+
+          // Items summary
+          ...widget.items.map((item) => Padding(
+            padding: const EdgeInsets.only(bottom: 6),
+            child: Row(children: [
+              Expanded(child: Text(item.name,
+                  style: const TextStyle(fontSize: 13, color: AppColors.slate700))),
+              Text('${item.quantity} x ${formatCurrency(item.unitPrice)}',
+                  style: const TextStyle(fontSize: 12, color: AppColors.slate400)),
+              const SizedBox(width: 8),
+              Text(formatCurrency(item.total),
+                  style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600, color: AppColors.slate800)),
+            ]),
+          )),
+
+          const SizedBox(height: 8),
+          const Divider(height: 1, color: AppColors.slate100),
+          const SizedBox(height: 8),
+          Row(children: [
+            const Text('JAMI:', style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700)),
+            const Spacer(),
+            Text(formatCurrency(widget.sale.totalAmount),
+                style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w700, color: AppColors.green)),
+          ]),
+
+          const SizedBox(height: 20),
+
+          if (_loading)
+            const Padding(
+              padding: EdgeInsets.symmetric(vertical: 12),
+              child: CircularProgressIndicator(),
+            )
+          else
+            Row(children: [
+              // Share button
+              Expanded(
+                child: OutlinedButton.icon(
+                  onPressed: _share,
+                  icon: const Icon(Icons.share_outlined, size: 18),
+                  label: const Text('Ulashish'),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.primary,
+                    side: const BorderSide(color: AppColors.primary),
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 12),
+              // Print button
+              Expanded(
+                child: ElevatedButton.icon(
+                  onPressed: _print,
+                  icon: const Icon(Icons.print_outlined, size: 18),
+                  label: const Text('Chop etish'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: AppColors.primary,
+                    foregroundColor: AppColors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(14)),
+                  ),
+                ),
+              ),
+            ]),
+
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text("Yopish", style: TextStyle(color: AppColors.slate400)),
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
