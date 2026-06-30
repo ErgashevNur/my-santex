@@ -88,8 +88,6 @@ export default function SalesPage() {
       if (exists) return prev.map(i => i.productId === product.id ? { ...i, quantity: i.quantity + 1 } : i)
       return [...prev, { productId: product.id, name: product.name, quantity: 1, unitPrice: Number(product.sellPrice) }]
     })
-    setProductSearch('')
-    setMobileTab('cart')
   }
 
   const updateQty = (productId: string, qty: number) => {
@@ -273,7 +271,7 @@ export default function SalesPage() {
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 flex-1 min-h-0">
         {/* LEFT — Tovarlar */}
-        <Card className={cn('flex flex-col overflow-hidden p-4', mobileTab !== 'search' && 'hidden lg:flex')}>
+        <Card className={cn('flex flex-col overflow-hidden p-4 relative', mobileTab !== 'search' && 'hidden lg:flex')}>
           <div className="flex items-center justify-between mb-3">
             <p className="text-sm font-semibold text-slate-700">Tovarlar</p>
             <span className="text-xs text-slate-400">{(products as SaleProduct[]).length} ta</span>
@@ -293,54 +291,70 @@ export default function SalesPage() {
               const stock = Number(p.stock)
               const outOfStock = stock <= 0
               const lowStock = stock > 0 && stock <= 5
+              const cartQty = cart.find(i => i.productId === p.id)?.quantity ?? 0
+              const inCart = cartQty > 0
               return (
                 <button
                   key={p.id}
                   onClick={() => !outOfStock && addToCart(p)}
                   disabled={outOfStock}
                   className={cn(
-                    'w-full flex items-center justify-between px-3 py-2.5 text-left rounded-lg border transition-colors',
+                    'w-full flex items-center justify-between px-3 py-2.5 text-left rounded-lg border transition-all',
                     outOfStock
                       ? 'bg-slate-50 border-slate-100 opacity-60 cursor-not-allowed'
-                      : lowStock
-                        ? 'bg-orange-50 border-orange-200 hover:bg-orange-100 hover:border-orange-300'
-                        : 'bg-white border-slate-100 hover:bg-blue-50 hover:border-blue-200',
+                      : inCart
+                        ? 'bg-blue-50 border-blue-300 ring-1 ring-blue-200'
+                        : lowStock
+                          ? 'bg-orange-50 border-orange-200 hover:bg-orange-100'
+                          : 'bg-white border-slate-100 hover:bg-blue-50 hover:border-blue-200',
                   )}
                 >
                   <div className="min-w-0 flex-1">
                     <p className={cn(
                       'text-sm font-medium truncate',
-                      outOfStock ? 'text-slate-400' : 'text-slate-800',
+                      outOfStock ? 'text-slate-400' : inCart ? 'text-blue-700' : 'text-slate-800',
                     )}>
                       {p.name}
                     </p>
                     <div className="flex items-center gap-2 mt-1">
                       {outOfStock ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">
-                          Tugagan
-                        </span>
+                        <span className="text-xs font-semibold text-red-600 bg-red-100 px-1.5 py-0.5 rounded">Tugagan</span>
                       ) : lowStock ? (
-                        <span className="inline-flex items-center gap-1 text-xs font-semibold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">
-                          ⚠ Kam: {stock} ta
-                        </span>
+                        <span className="text-xs font-semibold text-orange-600 bg-orange-100 px-1.5 py-0.5 rounded">⚠ {stock} ta</span>
                       ) : (
                         <span className="text-xs text-slate-400">{stock} ta</span>
                       )}
-                      {p.barcode && (
-                        <span className="text-xs text-slate-300">· {p.barcode}</span>
-                      )}
                     </div>
                   </div>
-                  <span className={cn(
-                    'text-sm font-bold ml-3 shrink-0',
-                    outOfStock ? 'text-slate-400' : 'text-blue-600',
-                  )}>
-                    {formatCurrency(p.sellPrice)}
-                  </span>
+                  <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {inCart && (
+                      <span className="bg-blue-600 text-white text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center leading-none">
+                        {cartQty}
+                      </span>
+                    )}
+                    <span className={cn('text-sm font-bold', outOfStock ? 'text-slate-400' : inCart ? 'text-blue-600' : 'text-blue-600')}>
+                      {formatCurrency(p.sellPrice)}
+                    </span>
+                  </div>
                 </button>
               )
             })}
           </div>
+          {/* Savatga o'tish tugmasi — faqat mobil, savat to'liq bo'lsa */}
+          {cart.length > 0 && (
+            <div className="lg:hidden mt-3 shrink-0">
+              <button
+                onClick={() => setMobileTab('cart')}
+                className="w-full py-3 bg-blue-600 text-white rounded-xl font-semibold flex items-center justify-center gap-2 active:scale-98 transition-all"
+              >
+                <ShoppingCart size={18} />
+                Savatga o'tish
+                <span className="bg-white text-blue-600 text-xs font-bold px-2 py-0.5 rounded-full">
+                  {cart.length} ta · {formatCurrency(total)}
+                </span>
+              </button>
+            </div>
+          )}
         </Card>
 
         {/* RIGHT — Savat + Checkout */}
