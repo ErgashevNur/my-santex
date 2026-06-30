@@ -1,0 +1,15 @@
+<?xml version="1.0"?>
+<svg xmlns="http://www.w3.org/2000/svg" width="640" height="160" viewBox="0 0 640 160">
+  <g transform="translate(20 30) scale(1)">
+    
+  <rect x="10" y="8" width="44" height="12" rx="6" fill="#2563EB"></rect>
+  <rect x="26" y="19" width="14" height="53" rx="6" fill="#2563EB"></rect>
+  <rect x="36" y="44" width="40" height="12" rx="6" fill="#2563EB"></rect>
+  <rect x="68" y="55" width="8" height="14" fill="#2563EB"></rect>
+  <circle cx="72" cy="80" r="11" fill="#2563EB"></circle>
+
+  </g>
+  <text x="140" y="75" font-family="DM Sans, Helvetica, sans-serif" font-weight="300" font-size="58" fill="#60A5FA">My</text>
+  <text x="218" y="75" font-family="DM Sans, Helvetica, sans-serif" font-weight="800" font-size="58" fill="#0F172A">Santex</text>
+  <text x="141" y="100" font-family="DM Sans, Helvetica, sans-serif" font-weight="500" font-size="16" fill="#94A3B8" letter-spacing="2">SANTEXNIKA BOSHQARUV TIZIMI</text>
+</svg>
