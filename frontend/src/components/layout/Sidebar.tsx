@@ -44,9 +44,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     >
       {/* Logo */}
       <div className={cn('flex items-center gap-3 p-4 border-b border-slate-700', collapsed && 'justify-center')}>
-        <div className="w-8 h-8 bg-blue-500 rounded-lg flex items-center justify-center font-bold text-sm flex-shrink-0">
-          MS
-        </div>
+        <img src="/My%20Santex%20-%20app-icon-blue.svg" alt="My Santex" className="w-8 h-8 rounded-lg flex-shrink-0" />
         {!collapsed && (
           <span className="font-semibold text-sm truncate">
             {isSuperAdmin ? 'My Santex Admin' : user?.store?.name || 'My Santex'}
