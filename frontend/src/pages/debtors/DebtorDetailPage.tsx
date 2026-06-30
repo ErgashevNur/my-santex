@@ -4,6 +4,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { debtorsApi } from '../../api/debtors'
 import { formatCurrency } from '../../lib/utils'
 import { ArrowLeft, Plus, Minus, Trash2, Phone, TrendingDown, TrendingUp, X } from 'lucide-react'
+import { useKeyboardHeight } from '../../hooks/useKeyboardHeight'
 
 type Modal = 'debt' | 'payment' | null
 
@@ -24,6 +25,7 @@ export default function DebtorDetailPage() {
   const [modal, setModal] = useState<Modal>(null)
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
+  const keyboardHeight = useKeyboardHeight()
 
   const { data: debtor, isLoading } = useQuery({
     queryKey: ['debtor', id],
@@ -104,7 +106,6 @@ export default function DebtorDetailPage() {
   const totalDebt = Number(debtor.totalDebt)
   const isInDebt = totalDebt > 0
   const initials = debtor.name.charAt(0).toUpperCase()
-
   const debtTxCount = debtor.transactions.filter(t => t.type === 'DEBT').length
   const paymentTxCount = debtor.transactions.filter(t => t.type === 'PAYMENT').length
 
@@ -113,7 +114,6 @@ export default function DebtorDetailPage() {
 
       {/* Qizil header */}
       <div className="bg-red-600 px-4 pt-5 pb-16">
-        {/* Nav */}
         <div className="flex items-center justify-between mb-5">
           <button
             onClick={() => navigate('/debtors')}
@@ -129,7 +129,6 @@ export default function DebtorDetailPage() {
           </button>
         </div>
 
-        {/* Shaxs ma'lumoti */}
         <div className="flex items-center gap-4">
           <div className="w-16 h-16 rounded-full bg-white/20 flex items-center justify-center flex-shrink-0 border-2 border-white/30">
             <span className="text-white font-bold text-2xl">{initials}</span>
@@ -155,7 +154,7 @@ export default function DebtorDetailPage() {
       {/* Asosiy kontent */}
       <div className="flex-1 -mt-4 rounded-t-3xl bg-slate-50 px-4 pt-4 pb-36 space-y-3">
 
-        {/* Qarz summasi kartasi */}
+        {/* Qarz summasi */}
         <div className={`rounded-2xl p-4 border ${isInDebt ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
           <p className={`text-xs font-semibold mb-1 ${isInDebt ? 'text-red-400' : 'text-green-500'}`}>
             {isInDebt ? 'JORIY QARZ' : 'QARZ YO\'Q'}
@@ -163,8 +162,6 @@ export default function DebtorDetailPage() {
           <p className={`text-3xl font-bold ${isInDebt ? 'text-red-600' : 'text-green-600'}`}>
             {formatCurrency(totalDebt)}
           </p>
-
-          {/* Mini statistika */}
           <div className="flex gap-4 mt-3 pt-3 border-t border-dashed" style={{ borderColor: isInDebt ? '#fca5a5' : '#86efac' }}>
             <div className="flex items-center gap-1.5">
               <TrendingDown size={14} className="text-red-400" />
@@ -182,7 +179,6 @@ export default function DebtorDetailPage() {
           <h2 className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-2 px-1">
             Kirdi-chiqdi tarixi
           </h2>
-
           {debtor.transactions.length === 0 ? (
             <div className="bg-white rounded-2xl p-8 text-center border border-slate-100">
               <p className="text-slate-300 text-4xl mb-2">📋</p>
@@ -198,26 +194,19 @@ export default function DebtorDetailPage() {
                     key={tx.id}
                     className={`flex items-center gap-3 p-3.5 rounded-2xl border ${isDebt ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}
                   >
-                    {/* Ikon */}
                     <div className={`w-9 h-9 rounded-xl flex items-center justify-center flex-shrink-0 ${isDebt ? 'bg-red-100' : 'bg-green-100'}`}>
                       {isDebt
                         ? <TrendingDown size={16} className="text-red-500" />
                         : <TrendingUp size={16} className="text-green-600" />
                       }
                     </div>
-
-                    {/* Ma'lumot */}
                     <div className="flex-1 min-w-0">
                       <p className={`text-xs font-semibold ${isDebt ? 'text-red-500' : 'text-green-600'}`}>
                         {isDebt ? 'Qarz berildi' : 'To\'lov qilindi'}
                       </p>
-                      {tx.note && (
-                        <p className="text-sm text-slate-600 truncate mt-0.5">{tx.note}</p>
-                      )}
+                      {tx.note && <p className="text-sm text-slate-600 truncate mt-0.5">{tx.note}</p>}
                       <p className="text-xs text-slate-400 mt-0.5">{date} · {time}</p>
                     </div>
-
-                    {/* Summa */}
                     <p className={`font-bold text-base flex-shrink-0 ${isDebt ? 'text-red-600' : 'text-green-600'}`}>
                       {isDebt ? '+' : '-'}{formatCurrency(Number(tx.amount))}
                     </p>
@@ -248,69 +237,88 @@ export default function DebtorDetailPage() {
         </button>
       </div>
 
-      {/* Bottom sheet modal */}
+      {/* Bottom sheet modal — keyboard-aware */}
       {modal && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-end" onClick={closeModal}>
+        <div
+          className="fixed inset-0 bg-black/50 z-50"
+          onClick={closeModal}
+        >
           <div
-            className="w-full bg-white rounded-t-3xl px-5 pt-4 pb-8 space-y-4"
+            className="absolute left-0 right-0 bg-white rounded-t-3xl"
+            style={{ bottom: keyboardHeight }}
             onClick={e => e.stopPropagation()}
           >
             {/* Drag handle */}
-            <div className="w-10 h-1 bg-slate-200 rounded-full mx-auto" />
-
-            {/* Sarlavha */}
-            <div className="flex items-center justify-between">
-              <h3 className="font-bold text-lg text-slate-800">
-                {modal === 'debt' ? 'Qarz qo\'shish' : 'To\'lov qabul qilish'}
-              </h3>
-              <button onClick={closeModal} className="p-1.5 text-slate-400 hover:text-slate-600 rounded-lg hover:bg-slate-100">
-                <X size={20} />
-              </button>
+            <div className="flex justify-center pt-3 pb-1">
+              <div className="w-10 h-1 bg-slate-200 rounded-full" />
             </div>
 
-            {/* Summa */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                SUMMA (SO'M) <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="number"
-                inputMode="numeric"
-                placeholder="0"
-                value={amount}
-                onChange={e => setAmount(e.target.value)}
-                className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl text-base font-semibold focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
-                autoFocus
-              />
-            </div>
+            {/* Scroll qilinadigan kontent */}
+            <div
+              className="overflow-y-auto px-5 pb-8"
+              style={{ maxHeight: `calc(85dvh - ${keyboardHeight}px)` }}
+            >
+              {/* Sarlavha */}
+              <div className="flex items-center justify-between py-3">
+                <h3 className="font-bold text-lg text-slate-800">
+                  {modal === 'debt' ? 'Qarz qo\'shish' : 'To\'lov qabul qilish'}
+                </h3>
+                <button
+                  onClick={closeModal}
+                  className="p-1.5 text-slate-400 rounded-xl hover:bg-slate-100"
+                >
+                  <X size={20} />
+                </button>
+              </div>
 
-            {/* Izoh */}
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 mb-1.5">IZOH (IXTIYORIY)</label>
-              <input
-                type="text"
-                placeholder="Nima uchun?"
-                value={note}
-                onChange={e => setNote(e.target.value)}
-                className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
-              />
-            </div>
+              <div className="space-y-3 pb-2">
+                {/* Summa */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                    SUMMA (SO'M) <span className="text-red-500">*</span>
+                  </label>
+                  <input
+                    type="number"
+                    inputMode="numeric"
+                    placeholder="0"
+                    value={amount}
+                    onChange={e => setAmount(e.target.value)}
+                    className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl text-base font-semibold focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
+                    autoFocus
+                  />
+                </div>
 
-            {/* Tugmalar */}
-            <div className="flex gap-3 pt-1">
-              <button
-                onClick={closeModal}
-                className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-medium active:bg-slate-50"
-              >
-                Bekor
-              </button>
-              <button
-                onClick={handleSubmit}
-                disabled={!amount || Number(amount) <= 0 || addDebt.isPending || addPayment.isPending}
-                className={`flex-1 py-3.5 rounded-2xl text-white font-semibold disabled:opacity-50 active:scale-95 transition-all ${modal === 'debt' ? 'bg-red-600 active:bg-red-700' : 'bg-green-600 active:bg-green-700'}`}
-              >
-                {addDebt.isPending || addPayment.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
-              </button>
+                {/* Izoh */}
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                    IZOH (IXTIYORIY)
+                  </label>
+                  <input
+                    type="text"
+                    placeholder="Nima uchun?"
+                    value={note}
+                    onChange={e => setNote(e.target.value)}
+                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
+                  />
+                </div>
+
+                {/* Tugmalar */}
+                <div className="flex gap-3 pt-1">
+                  <button
+                    onClick={closeModal}
+                    className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-medium active:bg-slate-50"
+                  >
+                    Bekor
+                  </button>
+                  <button
+                    onClick={handleSubmit}
+                    disabled={!amount || Number(amount) <= 0 || addDebt.isPending || addPayment.isPending}
+                    className={`flex-1 py-3.5 rounded-2xl text-white font-semibold disabled:opacity-50 active:scale-95 transition-all ${modal === 'debt' ? 'bg-red-600' : 'bg-green-600'}`}
+                  >
+                    {addDebt.isPending || addPayment.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
+                  </button>
+                </div>
+              </div>
             </div>
           </div>
         </div>
