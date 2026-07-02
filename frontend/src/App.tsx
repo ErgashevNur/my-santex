@@ -5,6 +5,7 @@ import { useAuthStore } from './store/auth.store'
 import AppLayout from './components/layout/AppLayout'
 import SplashScreen from './components/SplashScreen'
 import ProtectedRoute from './components/shared/ProtectedRoute'
+import LandingPage from './pages/landing/LandingPage'
 import LoginPage from './pages/auth/LoginPage'
 import SetupFacePage from './pages/auth/SetupFacePage'
 import DashboardPage from './pages/dashboard/DashboardPage'
@@ -29,6 +30,21 @@ function StoreRedirect() {
   return <Navigate to="/dashboard" replace />
 }
 
+function RootRoute() {
+  const { user, token, isInitializing } = useAuthStore()
+
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-slate-50">
+        <div className="w-8 h-8 border-3 border-blue-600 border-t-transparent rounded-full animate-spin" />
+      </div>
+    )
+  }
+
+  if (!token || !user) return <LandingPage />
+  return <StoreRedirect />
+}
+
 function AppContent() {
   const { loadUser, logout } = useAuthStore()
 
@@ -43,19 +59,18 @@ function AppContent() {
   return (
     <BrowserRouter>
       <Routes>
+        <Route path="/" element={<RootRoute />} />
         <Route path="/login" element={<LoginPage />} />
         <Route path="/setup" element={<SetupFacePage />} />
 
         {/* Store routes */}
         <Route
-          path="/"
           element={
             <ProtectedRoute>
               <AppLayout />
             </ProtectedRoute>
           }
         >
-          <Route index element={<StoreRedirect />} />
           <Route path="dashboard" element={<DashboardPage />} />
           <Route path="products" element={<ProductsPage />} />
           <Route path="sales" element={<SalesPage />} />
