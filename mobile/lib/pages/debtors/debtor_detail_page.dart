@@ -78,14 +78,14 @@ class _DebtorDetail extends ConsumerWidget {
                   onPressed: () async {
                     final confirm = await showDialog<bool>(
                       context: context,
-                      builder: (_) => AlertDialog(
+                      builder: (dialogCtx) => AlertDialog(
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
                         title: const Text("O'chirish"),
                         content: Text("${debtor.name} ni o'chirish?"),
                         actions: [
-                          TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Bekor')),
+                          TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Bekor')),
                           TextButton(
-                            onPressed: () => Navigator.pop(context, true),
+                            onPressed: () => Navigator.pop(dialogCtx, true),
                             child: const Text("O'chirish", style: TextStyle(color: AppColors.red)),
                           ),
                         ],
@@ -274,6 +274,7 @@ class _DebtorDetail extends ConsumerWidget {
       backgroundColor: Colors.transparent,
       builder: (_) => _TxSheet(
         isDebt: isDebt,
+        totalDebt: debtor.totalDebt,
         onSave: (amount, note) async {
           final api = ref.read(debtorsApiProvider);
           if (isDebt) {
@@ -335,8 +336,9 @@ class _TxCard extends StatelessWidget {
 
 class _TxSheet extends StatefulWidget {
   final bool isDebt;
+  final double totalDebt;
   final Future<void> Function(double amount, String? note) onSave;
-  const _TxSheet({required this.isDebt, required this.onSave});
+  const _TxSheet({required this.isDebt, required this.totalDebt, required this.onSave});
   @override
   State<_TxSheet> createState() => _TxSheetState();
 }
@@ -374,6 +376,28 @@ class _TxSheetState extends State<_TxSheet> {
               IconButton(icon: const Icon(Icons.close, color: AppColors.slate400),
                   onPressed: () => Navigator.pop(context)),
             ]),
+            if (!widget.isDebt && widget.totalDebt > 0) ...[
+              const SizedBox(height: 12),
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: _loading ? null : _payFull,
+                  icon: const Icon(Icons.done_all, size: 18),
+                  label: Text("To'liq to'lash — ${formatCurrency(widget.totalDebt)}"),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: AppColors.green,
+                    padding: const EdgeInsets.symmetric(vertical: 14),
+                    side: const BorderSide(color: AppColors.green, width: 1.5),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 4),
+              const Center(
+                child: Text('yoki qo\'lda kiriting:',
+                    style: TextStyle(fontSize: 11, color: AppColors.slate400)),
+              ),
+            ],
             const SizedBox(height: 16),
             Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
               const Text('SUMMA (SO\'M) *',
@@ -435,6 +459,40 @@ class _TxSheetState extends State<_TxSheet> {
     setState(() => _loading = true);
     try {
       await widget.onSave(amount, _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim());
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(extractError(e)), backgroundColor: AppColors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+
+  Future<void> _payFull() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      useRootNavigator: false,
+      builder: (dialogCtx) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text("To'liq to'lash"),
+        content: Text(
+          "Qarzdorning butun qarzi — ${formatCurrency(widget.totalDebt)} — to'liq to'langan deb belgilanadi. Tasdiqlaysizmi?",
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(dialogCtx, false), child: const Text('Bekor')),
+          TextButton(
+            onPressed: () => Navigator.pop(dialogCtx, true),
+            child: const Text('Tasdiqlash', style: TextStyle(color: AppColors.green)),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+
+    setState(() => _loading = true);
+    try {
+      await widget.onSave(widget.totalDebt, _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim());
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(
