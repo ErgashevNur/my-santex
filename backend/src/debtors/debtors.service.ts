@@ -28,6 +28,9 @@ export class DebtorsService {
       include: {
         transactions: {
           orderBy: { createdAt: 'desc' },
+          include: {
+            user: { select: { id: true, name: true } },
+          },
         },
       },
     });
@@ -46,13 +49,14 @@ export class DebtorsService {
     return this.prisma.debtor.delete({ where: { id } });
   }
 
-  async addDebt(id: string, storeId: string, dto: AddDebtDto) {
+  async addDebt(id: string, storeId: string, userId: string, dto: AddDebtDto) {
     await this.findOne(id, storeId);
     return this.prisma.$transaction([
       this.prisma.debtTransaction.create({
         data: {
           storeId,
           debtorId: id,
+          userId,
           type: DebtTxType.DEBT,
           amount: dto.amount,
           note: dto.note,
@@ -65,7 +69,7 @@ export class DebtorsService {
     ]);
   }
 
-  async addPayment(id: string, storeId: string, dto: AddPaymentDto) {
+  async addPayment(id: string, storeId: string, userId: string, dto: AddPaymentDto) {
     const debtor = await this.findOne(id, storeId);
     if (Number(debtor.totalDebt) < dto.amount) {
       throw new BadRequestException(
@@ -77,6 +81,7 @@ export class DebtorsService {
         data: {
           storeId,
           debtorId: id,
+          userId,
           type: DebtTxType.PAYMENT,
           amount: dto.amount,
           note: dto.note,

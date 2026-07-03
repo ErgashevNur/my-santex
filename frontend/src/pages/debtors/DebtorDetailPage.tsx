@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { debtorsApi } from '../../api/debtors'
 import { formatCurrency } from '../../lib/utils'
-import { ArrowLeft, Plus, Minus, Trash2, Phone, TrendingDown, TrendingUp, X } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, Trash2, Phone, TrendingDown, TrendingUp, X, User as UserIcon } from 'lucide-react'
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight'
 
 type Modal = 'debt' | 'payment' | null
@@ -206,6 +206,12 @@ export default function DebtorDetailPage() {
                       </p>
                       {tx.note && <p className="text-sm text-slate-600 truncate mt-0.5">{tx.note}</p>}
                       <p className="text-xs text-slate-400 mt-0.5">{date} · {time}</p>
+                      {tx.user?.name && (
+                        <p className="flex items-center gap-1 text-xs text-slate-500 mt-1 font-medium">
+                          <UserIcon size={11} />
+                          {tx.user.name}
+                        </p>
+                      )}
                     </div>
                     <p className={`font-bold text-base flex-shrink-0 ${isDebt ? 'text-red-600' : 'text-green-600'}`}>
                       {isDebt ? '+' : '-'}{formatCurrency(Number(tx.amount))}

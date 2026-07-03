@@ -46,7 +46,7 @@ export class DebtorsController {
     @Body() dto: AddDebtDto,
     @CurrentUser() user: JwtUser,
   ) {
-    return this.service.addDebt(id, user.storeId ?? '', dto);
+    return this.service.addDebt(id, user.storeId ?? '', user.id, dto);
   }
 
   @Post(':id/payment')
@@ -55,6 +55,6 @@ export class DebtorsController {
     @Body() dto: AddPaymentDto,
     @CurrentUser() user: JwtUser,
   ) {
-    return this.service.addPayment(id, user.storeId ?? '', dto);
+    return this.service.addPayment(id, user.storeId ?? '', user.id, dto);
   }
 }

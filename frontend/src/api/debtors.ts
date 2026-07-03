@@ -15,6 +15,7 @@ export interface DebtTransaction {
   amount: number
   note?: string | null
   createdAt: string
+  user?: { id: string; name: string } | null
 }
 
 export interface DebtorDetail extends Debtor {

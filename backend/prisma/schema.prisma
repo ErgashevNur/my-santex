@@ -62,6 +62,7 @@ model User {
   notifications      notifications[]
   sales              Sale[]
   store              Store?               @relation(fields: [storeId], references: [id])
+  debtTransactions   DebtTransaction[]
 
   @@map("users")
 }
@@ -177,6 +178,8 @@ model DebtTransaction {
   storeId   String
   debtorId  String
   debtor    Debtor          @relation(fields: [debtorId], references: [id], onDelete: Cascade)
+  userId    String?
+  user      User?           @relation(fields: [userId], references: [id])
   type      DebtTxType
   amount    Decimal         @db.Decimal(12, 2)
   note      String?
@@ -184,6 +187,7 @@ model DebtTransaction {
 
   @@index([debtorId])
   @@index([storeId])
+  @@index([userId])
   @@map("debt_transactions")
 }
 
