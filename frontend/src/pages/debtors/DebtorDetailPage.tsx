@@ -3,10 +3,10 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { debtorsApi } from '../../api/debtors'
 import { formatCurrency } from '../../lib/utils'
-import { ArrowLeft, Plus, Minus, Trash2, Phone, TrendingDown, TrendingUp, X, User as UserIcon } from 'lucide-react'
+import { ArrowLeft, Plus, Minus, Trash2, Pencil, Phone, TrendingDown, TrendingUp, X, User as UserIcon } from 'lucide-react'
 import { useKeyboardHeight } from '../../hooks/useKeyboardHeight'
 
-type Modal = 'debt' | 'payment' | null
+type Modal = 'debt' | 'payment' | 'edit' | null
 
 function fmtDate(iso: string) {
   const d = new Date(iso)
@@ -25,6 +25,8 @@ export default function DebtorDetailPage() {
   const [modal, setModal] = useState<Modal>(null)
   const [amount, setAmount] = useState('')
   const [note, setNote] = useState('')
+  const [editName, setEditName] = useState('')
+  const [editPhone, setEditPhone] = useState('')
   const keyboardHeight = useKeyboardHeight()
 
   const { data: debtor, isLoading } = useQuery({
@@ -58,9 +60,31 @@ export default function DebtorDetailPage() {
     onSuccess: () => navigate('/debtors'),
   })
 
+  const updateDebtor = useMutation({
+    mutationFn: (data: { name?: string; phone?: string }) => debtorsApi.update(id!, data),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['debtor', id] })
+      qc.invalidateQueries({ queryKey: ['debtors'] })
+      closeModal()
+    },
+  })
+
   const closeModal = () => { setModal(null); setAmount(''); setNote('') }
 
+  const openEditModal = () => {
+    if (!debtor) return
+    setEditName(debtor.name)
+    setEditPhone(debtor.phone || '')
+    setModal('edit')
+  }
+
   const handleSubmit = () => {
+    if (modal === 'edit') {
+      const name = editName.trim()
+      if (!name) return
+      updateDebtor.mutate({ name, phone: editPhone.trim() })
+      return
+    }
     const n = Number(amount)
     if (!n || n <= 0) return
     if (modal === 'debt') addDebt.mutate({ amount: n, note: note || undefined })
@@ -121,12 +145,20 @@ export default function DebtorDetailPage() {
           >
             <ArrowLeft size={20} className="text-white" />
           </button>
-          <button
-            onClick={() => { if (confirm('Qarzdorni o\'chirish?')) deleteDebtor.mutate() }}
-            className="p-2 rounded-xl bg-white/15 active:bg-white/25 transition-colors"
-          >
-            <Trash2 size={18} className="text-white" />
-          </button>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={openEditModal}
+              className="p-2 rounded-xl bg-white/15 active:bg-white/25 transition-colors"
+            >
+              <Pencil size={17} className="text-white" />
+            </button>
+            <button
+              onClick={() => { if (confirm('Qarzdorni o\'chirish?')) deleteDebtor.mutate() }}
+              className="p-2 rounded-xl bg-white/15 active:bg-white/25 transition-colors"
+            >
+              <Trash2 size={18} className="text-white" />
+            </button>
+          </div>
         </div>
 
         <div className="flex items-center gap-4">
@@ -267,7 +299,7 @@ export default function DebtorDetailPage() {
               {/* Sarlavha */}
               <div className="flex items-center justify-between py-3">
                 <h3 className="font-bold text-lg text-slate-800">
-                  {modal === 'debt' ? 'Qarz qo\'shish' : 'To\'lov qabul qilish'}
+                  {modal === 'debt' ? 'Qarz qo\'shish' : modal === 'payment' ? 'To\'lov qabul qilish' : 'Mijozni tahrirlash'}
                 </h3>
                 <button
                   onClick={closeModal}
@@ -277,54 +309,104 @@ export default function DebtorDetailPage() {
                 </button>
               </div>
 
-              <div className="space-y-3 pb-2">
-                {/* Summa */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                    SUMMA (SO'M) <span className="text-red-500">*</span>
-                  </label>
-                  <input
-                    type="number"
-                    inputMode="numeric"
-                    placeholder="0"
-                    value={amount}
-                    onChange={e => setAmount(e.target.value)}
-                    className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl text-base font-semibold focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
-                    autoFocus
-                  />
-                </div>
+              {modal === 'edit' ? (
+                <div className="space-y-3 pb-2">
+                  {/* Ismi */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                      ISMI <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Mijozning ismi"
+                      value={editName}
+                      onChange={e => setEditName(e.target.value)}
+                      className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl text-base font-semibold focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
+                      autoFocus
+                    />
+                  </div>
 
-                {/* Izoh */}
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 mb-1.5">
-                    IZOH (IXTIYORIY)
-                  </label>
-                  <input
-                    type="text"
-                    placeholder="Nima uchun?"
-                    value={note}
-                    onChange={e => setNote(e.target.value)}
-                    className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
-                  />
-                </div>
+                  {/* Telefon */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                      TELEFON
+                    </label>
+                    <input
+                      type="tel"
+                      placeholder="+998..."
+                      value={editPhone}
+                      onChange={e => setEditPhone(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
+                    />
+                  </div>
 
-                {/* Tugmalar */}
-                <div className="flex gap-3 pt-1">
-                  <button
-                    onClick={closeModal}
-                    className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-medium active:bg-slate-50"
-                  >
-                    Bekor
-                  </button>
-                  <button
-                    onClick={handleSubmit}
-                    disabled={!amount || Number(amount) <= 0 || addDebt.isPending || addPayment.isPending}
-                    className={`flex-1 py-3.5 rounded-2xl text-white font-semibold disabled:opacity-50 active:scale-95 transition-all ${modal === 'debt' ? 'bg-red-600' : 'bg-green-600'}`}
-                  >
-                    {addDebt.isPending || addPayment.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
-                  </button>
+                  {/* Tugmalar */}
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={closeModal}
+                      className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-medium active:bg-slate-50"
+                    >
+                      Bekor
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!editName.trim() || updateDebtor.isPending}
+                      className="flex-1 py-3.5 rounded-2xl text-white font-semibold disabled:opacity-50 active:scale-95 transition-all bg-red-600"
+                    >
+                      {updateDebtor.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              ) : (
+                <div className="space-y-3 pb-2">
+                  {/* Summa */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                      SUMMA (SO'M) <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="number"
+                      inputMode="numeric"
+                      placeholder="0"
+                      value={amount}
+                      onChange={e => setAmount(e.target.value)}
+                      className="w-full px-4 py-3.5 border border-slate-200 rounded-2xl text-base font-semibold focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
+                      autoFocus
+                    />
+                  </div>
+
+                  {/* Izoh */}
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 mb-1.5">
+                      IZOH (IXTIYORIY)
+                    </label>
+                    <input
+                      type="text"
+                      placeholder="Nima uchun?"
+                      value={note}
+                      onChange={e => setNote(e.target.value)}
+                      className="w-full px-4 py-3 border border-slate-200 rounded-2xl text-sm focus:outline-none focus:ring-2 focus:ring-red-400 bg-slate-50"
+                    />
+                  </div>
+
+                  {/* Tugmalar */}
+                  <div className="flex gap-3 pt-1">
+                    <button
+                      onClick={closeModal}
+                      className="flex-1 py-3.5 border border-slate-200 rounded-2xl text-slate-600 font-medium active:bg-slate-50"
+                    >
+                      Bekor
+                    </button>
+                    <button
+                      onClick={handleSubmit}
+                      disabled={!amount || Number(amount) <= 0 || addDebt.isPending || addPayment.isPending}
+                      className={`flex-1 py-3.5 rounded-2xl text-white font-semibold disabled:opacity-50 active:scale-95 transition-all ${modal === 'debt' ? 'bg-red-600' : 'bg-green-600'}`}
+                    >
+                      {addDebt.isPending || addPayment.isPending ? 'Saqlanmoqda...' : 'Saqlash'}
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

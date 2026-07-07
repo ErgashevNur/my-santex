@@ -30,6 +30,14 @@ class DebtorsApi {
     return Debtor.fromJson(res.data);
   }
 
+  Future<Debtor> update(String id, {String? name, String? phone}) async {
+    final res = await _dio.patch('/debtors/$id', data: {
+      if (name != null) 'name': name,
+      if (phone != null) 'phone': phone,
+    });
+    return Debtor.fromJson(res.data);
+  }
+
   Future<void> delete(String id) async {
     await _dio.delete('/debtors/$id');
   }

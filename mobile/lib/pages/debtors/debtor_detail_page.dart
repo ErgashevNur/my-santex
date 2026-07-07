@@ -73,6 +73,14 @@ class _DebtorDetail extends ConsumerWidget {
                   icon: Container(
                     padding: const EdgeInsets.all(6),
                     decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
+                    child: const Icon(Icons.edit_outlined, color: AppColors.white, size: 20),
+                  ),
+                  onPressed: () => _showEditModal(context, ref),
+                ),
+                IconButton(
+                  icon: Container(
+                    padding: const EdgeInsets.all(6),
+                    decoration: BoxDecoration(color: Colors.white.withOpacity(0.15), borderRadius: BorderRadius.circular(10)),
                     child: const Icon(Icons.delete_outline, color: AppColors.white, size: 20),
                   ),
                   onPressed: () async {
@@ -267,6 +275,22 @@ class _DebtorDetail extends ConsumerWidget {
     );
   }
 
+  void _showEditModal(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (_) => _EditDebtorSheet(
+        debtor: debtor,
+        onSave: (name, phone) async {
+          await ref.read(debtorsApiProvider).update(debtorId, name: name, phone: phone);
+          ref.invalidate(_debtorDetailProvider(debtorId));
+          ref.invalidate(debtorsProvider);
+        },
+      ),
+    );
+  }
+
   void _showTxModal(BuildContext context, WidgetRef ref, {required bool isDebt}) {
     showModalBottomSheet(
       context: context,
@@ -323,6 +347,16 @@ class _TxCard extends StatelessWidget {
             Text(tx.note!, style: const TextStyle(fontSize: 12, color: AppColors.slate600)),
           Text(formatDateTime(tx.createdAt),
               style: const TextStyle(fontSize: 11, color: AppColors.slate400)),
+          if (tx.user?.name != null && tx.user!.name.isNotEmpty)
+            Padding(
+              padding: const EdgeInsets.only(top: 2),
+              child: Row(mainAxisSize: MainAxisSize.min, children: [
+                const Icon(Icons.person_outline, size: 12, color: AppColors.slate500),
+                const SizedBox(width: 3),
+                Text(tx.user!.name,
+                    style: const TextStyle(fontSize: 11, color: AppColors.slate500, fontWeight: FontWeight.w600)),
+              ]),
+            ),
         ])),
         Text(
           '${isDebt ? '+' : '-'}${formatCurrency(tx.amount)}',
@@ -493,6 +527,101 @@ class _TxSheetState extends State<_TxSheet> {
     setState(() => _loading = true);
     try {
       await widget.onSave(widget.totalDebt, _noteCtrl.text.trim().isEmpty ? null : _noteCtrl.text.trim());
+      if (mounted) Navigator.pop(context);
+    } catch (e) {
+      if (mounted) ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(extractError(e)), backgroundColor: AppColors.red),
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+  }
+}
+
+class _EditDebtorSheet extends StatefulWidget {
+  final Debtor debtor;
+  final Future<void> Function(String name, String phone) onSave;
+  const _EditDebtorSheet({required this.debtor, required this.onSave});
+  @override
+  State<_EditDebtorSheet> createState() => _EditDebtorSheetState();
+}
+
+class _EditDebtorSheetState extends State<_EditDebtorSheet> {
+  late final _nameCtrl = TextEditingController(text: widget.debtor.name);
+  late final _phoneCtrl = TextEditingController(text: widget.debtor.phone ?? '');
+  bool _loading = false;
+
+  @override
+  void dispose() { _nameCtrl.dispose(); _phoneCtrl.dispose(); super.dispose(); }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: Container(
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        ),
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 8, 20, 32),
+          child: Column(children: [
+            Center(child: Container(
+              width: 40, height: 4, margin: const EdgeInsets.only(bottom: 16),
+              decoration: BoxDecoration(color: AppColors.slate200, borderRadius: BorderRadius.circular(2)),
+            )),
+            Row(children: [
+              const Expanded(child: Text('Mijozni tahrirlash',
+                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.w700))),
+              IconButton(icon: const Icon(Icons.close, color: AppColors.slate400),
+                  onPressed: () => Navigator.pop(context)),
+            ]),
+            const SizedBox(height: 16),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('ISMI *',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.slate500)),
+              const SizedBox(height: 6),
+              TextField(controller: _nameCtrl, autofocus: true, decoration: const InputDecoration()),
+            ]),
+            const SizedBox(height: 12),
+            Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+              const Text('TELEFON',
+                  style: TextStyle(fontSize: 10, fontWeight: FontWeight.w600, color: AppColors.slate500)),
+              const SizedBox(height: 6),
+              TextField(
+                controller: _phoneCtrl,
+                keyboardType: TextInputType.phone,
+                decoration: const InputDecoration(hintText: '+998...'),
+              ),
+            ]),
+            const SizedBox(height: 20),
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: _loading ? null : _save,
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: AppColors.red,
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                ),
+                child: _loading
+                    ? const SizedBox(width: 20, height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2, color: AppColors.white))
+                    : const Text('Saqlash', style: TextStyle(fontSize: 15, fontWeight: FontWeight.w600)),
+              ),
+            ),
+          ]),
+        ),
+      ),
+    );
+  }
+
+  Future<void> _save() async {
+    final name = _nameCtrl.text.trim();
+    if (name.isEmpty) return;
+    setState(() => _loading = true);
+    try {
+      await widget.onSave(name, _phoneCtrl.text.trim());
       if (mounted) Navigator.pop(context);
     } catch (e) {
       if (mounted) ScaffoldMessenger.of(context).showSnackBar(

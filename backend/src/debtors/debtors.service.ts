@@ -1,7 +1,7 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { PrismaService } from '../prisma/prisma.service';
 import { DebtTxType } from '@prisma/client';
-import { CreateDebtorDto, AddDebtDto, AddPaymentDto } from './dto/debtor.dto';
+import { CreateDebtorDto, UpdateDebtorDto, AddDebtDto, AddPaymentDto } from './dto/debtor.dto';
 
 @Injectable()
 export class DebtorsService {
@@ -41,6 +41,17 @@ export class DebtorsService {
   create(storeId: string, dto: CreateDebtorDto) {
     return this.prisma.debtor.create({
       data: { storeId, name: dto.name, phone: dto.phone },
+    });
+  }
+
+  async update(id: string, storeId: string, dto: UpdateDebtorDto) {
+    await this.findOne(id, storeId);
+    return this.prisma.debtor.update({
+      where: { id },
+      data: {
+        ...(dto.name !== undefined && { name: dto.name }),
+        ...(dto.phone !== undefined && { phone: dto.phone.trim() === '' ? null : dto.phone }),
+      },
     });
   }
 

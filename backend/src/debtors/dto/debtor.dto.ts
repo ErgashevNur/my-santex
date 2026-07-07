@@ -12,6 +12,18 @@ export class CreateDebtorDto {
   phone?: string;
 }
 
+export class UpdateDebtorDto {
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  name?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  phone?: string;
+}
+
 export class AddDebtDto {
   @ApiProperty()
   @IsNumber()

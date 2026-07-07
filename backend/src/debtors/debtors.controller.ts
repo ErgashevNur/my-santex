@@ -1,9 +1,9 @@
 import {
-  Controller, Get, Post, Delete, Param, Body, UseGuards,
+  Controller, Get, Post, Patch, Delete, Param, Body, UseGuards,
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth } from '@nestjs/swagger';
 import { DebtorsService } from './debtors.service';
-import { CreateDebtorDto, AddDebtDto, AddPaymentDto } from './dto/debtor.dto';
+import { CreateDebtorDto, UpdateDebtorDto, AddDebtDto, AddPaymentDto } from './dto/debtor.dto';
 import { JwtAuthGuard } from '../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../common/decorators/current-user.decorator';
 import type { JwtUser } from '../common/interfaces/jwt-user.interface';
@@ -33,6 +33,15 @@ export class DebtorsController {
   @Post()
   create(@Body() dto: CreateDebtorDto, @CurrentUser() user: JwtUser) {
     return this.service.create(user.storeId ?? '', dto);
+  }
+
+  @Patch(':id')
+  update(
+    @Param('id') id: string,
+    @Body() dto: UpdateDebtorDto,
+    @CurrentUser() user: JwtUser,
+  ) {
+    return this.service.update(id, user.storeId ?? '', dto);
   }
 
   @Delete(':id')

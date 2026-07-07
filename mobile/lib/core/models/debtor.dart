@@ -11,12 +11,23 @@ int _i(dynamic v, {int def = 0}) {
   return int.tryParse(v.toString()) ?? def;
 }
 
+class DebtTransactionUser {
+  final String id;
+  final String name;
+
+  DebtTransactionUser({required this.id, required this.name});
+
+  factory DebtTransactionUser.fromJson(Map<String, dynamic> j) =>
+      DebtTransactionUser(id: j['id'] ?? '', name: j['name'] ?? '');
+}
+
 class DebtTransaction {
   final String id;
   final String type;
   final double amount;
   final String? note;
   final String createdAt;
+  final DebtTransactionUser? user;
 
   DebtTransaction({
     required this.id,
@@ -24,6 +35,7 @@ class DebtTransaction {
     required this.amount,
     this.note,
     required this.createdAt,
+    this.user,
   });
 
   factory DebtTransaction.fromJson(Map<String, dynamic> j) => DebtTransaction(
@@ -32,6 +44,7 @@ class DebtTransaction {
         amount: _d(j['amount']),
         note: j['note'],
         createdAt: j['createdAt'] ?? DateTime.now().toIso8601String(),
+        user: j['user'] != null ? DebtTransactionUser.fromJson(j['user']) : null,
       );
 
   bool get isDebt => type == 'DEBT';
