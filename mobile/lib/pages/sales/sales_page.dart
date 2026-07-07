@@ -453,7 +453,7 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
     return generateReceiptPdf(
       sale: widget.sale,
       items: widget.items,
-      storeName: user?.store?.name ?? 'My Santex',
+      storeName: user?.store?.name ?? 'MY SANTEX',
       storeAddress: user?.store?.address,
       storePhone: user?.store?.phone,
       cashierName: user?.name,
@@ -479,7 +479,7 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
         onLayout: (format) => generateReceiptPdf(
           sale: widget.sale,
           items: widget.items,
-          storeName: user?.store?.name ?? 'My Santex',
+          storeName: user?.store?.name ?? 'MY SANTEX',
           storeAddress: user?.store?.address,
           storePhone: user?.store?.phone,
           cashierName: user?.name,

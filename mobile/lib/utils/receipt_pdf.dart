@@ -11,99 +11,117 @@ class ReceiptItem {
   const ReceiptItem({required this.name, required this.quantity, required this.unitPrice});
 }
 
-// "16 000 sum" — web bilan bir xil format
-String _money(double v) {
+// Web (print-agent/server.js buildReceipt) bilan bir xil grid — 80mm/Font A, 48 belgi.
+// Ustunlar: mahsulot nomi(20) + miqdor(7, markazda) + jami(21, o'ngda) = 48
+const int _kCols = 48;
+const int _kNameW = 20;
+const int _kQtyW = 7;
+const int _kTotalW = _kCols - _kNameW - _kQtyW;
+
+// "45,000" — web print-agent bilan bir xil (vergul bilan, probel emas)
+String _fmt(num v) {
   final s = v.round().toString().replaceAllMapped(
     RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
-    (m) => '${m[1]} ',
+    (m) => '${m[1]},',
   );
-  return '$s sum';
+  return s;
 }
+
+String _money(num v) => '${_fmt(v)} sum';
 
 String _pad(int n, int w) => n.toString().padLeft(w, '0');
 
+String _center(String s, int w) {
+  final pad = (w - s.length).clamp(0, w);
+  final left = pad ~/ 2;
+  final right = pad - left;
+  return ' ' * left + s + ' ' * right;
+}
+
+// Web'dagi row() bilan bir xil: chap+o'ng ustunni WIDTH belgiga tekislaydi
+String _row(String left, String right, {int width = _kCols}) {
+  var l = left;
+  var gap = width - l.length - right.length;
+  if (gap < 1) {
+    l = l.substring(0, (width - right.length - 1).clamp(0, l.length));
+    gap = (width - l.length - right.length).clamp(1, width);
+  }
+  return l + ' ' * gap + right;
+}
+
+// Web (print-agent) bilan bir xil nomlanish — CARD="Karta" (Plastik karta emas),
+// TRANSFER="O'tkazma" (Bank o'tkazma emas). INSTALLMENT web'da ham yo'q — xom qiymat
+// chiqadi, bu web'dagi mavjud xatti-harakat, mobilda ham shu holat saqlanadi (parity).
 const _paymentLabels = {
-  'CASH': 'NAQD PUL',
-  'CARD': 'PLASTIK KARTA',
-  'TRANSFER': "BANK O'TKAZMA",
-  'INSTALLMENT': "MUDDATLI TO'LOV",
+  'CASH': 'Naqd pul',
+  'CARD': 'Karta',
+  'TRANSFER': "O'tkazma",
+  'DEBT': 'Qarz',
+  'MIXED': 'Aralash',
 };
+
+String _paymentLabel(String m) =>
+    (_paymentLabels[m.toUpperCase()] ?? m).toUpperCase();
 
 Future<Uint8List> generateReceiptPdf({
   required Sale sale,
   required List<ReceiptItem> items,
-  String storeName = 'My Santex',
+  String storeName = 'MY SANTEX',
   String? storeAddress,
   String? storePhone,
   String? cashierName,
   PdfPageFormat? pageFormat,
 }) async {
   final pdf = pw.Document();
-  final courier    = pw.Font.courier();
+  final courier = pw.Font.courier();
   final courierBold = pw.Font.courierBold();
-  const fs = 10.0;
 
   // Printer margin'larini ishonib bo'lmaydi — o'zimiz belgilaymiz
   final paperWidth = pageFormat?.width ?? (80 * PdfPageFormat.mm);
   const fixedMargin = 3 * PdfPageFormat.mm; // 3mm chap + o'ng
-  final myFmt = PdfPageFormat(
+  final fmt = PdfPageFormat(
     paperWidth,
     double.infinity,
-    marginLeft:   fixedMargin,
-    marginRight:  fixedMargin,
-    marginTop:    2 * PdfPageFormat.mm,
+    marginLeft: fixedMargin,
+    marginRight: fixedMargin,
+    marginTop: 2 * PdfPageFormat.mm,
     marginBottom: 6 * PdfPageFormat.mm,
   );
-  final fmt = myFmt;
 
-  // Courier monospace: har bir belgi = 0.6 × fontSize kenglik
-  final charW   = fs * 0.6;
-  final nChars  = ((paperWidth - 2 * fixedMargin) / charW).floor();
-  final sepEq   = '=' * nChars;   // ═══ ajratuvchi
-  final sepDash = '-' * nChars;   // ─── item ajratuvchi
+  // Shrift o'lchami _kCols (48) belgi bir qatorga sig'adigan qilib hisoblanadi —
+  // Courier: 1 belgi ≈ 0.6 × fontSize. Shu orqali web'dagi 48-ustunli grid bilan
+  // bir xil qator uzunligi/qisqartirish chegarasi ta'minlanadi.
+  final availableWidth = paperWidth - 2 * fixedMargin;
+  final fs = availableWidth / (_kCols * 0.6);
 
-  // --- yordamchi funksiyalar ---
-
-  pw.Widget txt(
+  pw.Widget line(
     String s, {
     bool bold = false,
-    double size = fs,
+    double? size,
     pw.TextAlign align = pw.TextAlign.left,
   }) =>
       pw.Text(
         s,
         textAlign: align,
-        style: pw.TextStyle(
-          font: bold ? courierBold : courier,
-          fontSize: size,
-          lineSpacing: 0,
-        ),
+        style: pw.TextStyle(font: bold ? courierBold : courier, fontSize: size ?? fs, lineSpacing: 0),
       );
 
-  // Chap-o'ng qatorlar: spaceBetween bilan to'liq kenglikka yoziladi
-  pw.Widget kv(
-    String left,
-    String right, {
-    bool bold = false,
-    double size = fs,
-  }) =>
-      pw.Row(
-        mainAxisSize: pw.MainAxisSize.max,
-        mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
+  // Bir qatorda ikki xil qalinlikdagi matn (masalan "Chek   : " oddiy + "#000123" qalin)
+  pw.Widget line2(String a, String b, {bool aBold = false, bool bBold = false}) => pw.Row(
+        mainAxisSize: pw.MainAxisSize.min,
         children: [
-          txt(left, bold: bold, size: size),
-          txt(right, bold: bold, size: size),
+          pw.Text(a, style: pw.TextStyle(font: aBold ? courierBold : courier, fontSize: fs)),
+          pw.Text(b, style: pw.TextStyle(font: bBold ? courierBold : courier, fontSize: fs)),
         ],
       );
 
-  // Sana/vaqt formatlash
-  final dt      = DateTime.tryParse(sale.createdAt) ?? DateTime.now();
-  final dateStr = '${_pad(dt.day,2)}.${_pad(dt.month,2)}.${dt.year}';
-  final timeStr = '${_pad(dt.hour,2)}:${_pad(dt.minute,2)}';
-  final rcptNo  = '#${_pad(sale.receiptNo, 6)}';   // #000052 — 6 xonali
+  final sep = ''.padLeft(_kCols, '=');
+  final dash = ''.padLeft(_kCols, '-');
+  final dotted = (StringBuffer()..write('- ' * ((_kCols / 2).ceil()))).toString().substring(0, _kCols);
 
-  final double subtotal = items.fold(0.0, (s, i) => s + i.total);
-  final discount = sale.discountAmount;
+  final dt = DateTime.tryParse(sale.createdAt) ?? DateTime.now();
+  final dateStr = '${_pad(dt.day, 2)}.${_pad(dt.month, 2)}.${dt.year} ${_pad(dt.hour, 2)}:${_pad(dt.minute, 2)}';
+  final receiptId = '#${_pad(sale.receiptNo, 6)}';
 
   pdf.addPage(pw.Page(
     pageFormat: fmt,
@@ -111,115 +129,53 @@ Future<Uint8List> generateReceiptPdf({
       mainAxisSize: pw.MainAxisSize.min,
       crossAxisAlignment: pw.CrossAxisAlignment.stretch,
       children: [
-
         // ══════ SARLAVHA ══════
-        txt(sepEq),
-        pw.SizedBox(height: 3),
-        txt(storeName,
-            bold: true, size: fs + 4, align: pw.TextAlign.center),
-        if (storeAddress != null && storeAddress.isNotEmpty) ...[
-          pw.SizedBox(height: 1),
-          txt(storeAddress, align: pw.TextAlign.center, size: fs - 0.5),
-        ],
-        if (storePhone != null && storePhone.isNotEmpty) ...[
-          pw.SizedBox(height: 1),
-          txt(storePhone, align: pw.TextAlign.center, size: fs - 0.5),
-        ],
-        pw.SizedBox(height: 3),
-        txt(sepEq),
-        pw.SizedBox(height: 3),
+        line(sep),
+        line(storeName, bold: true, size: fs * 1.7, align: pw.TextAlign.center),
+        if (storeAddress != null && storeAddress.isNotEmpty) line(storeAddress, align: pw.TextAlign.center),
+        if (storePhone != null && storePhone.isNotEmpty) line(storePhone, align: pw.TextAlign.center),
+        line(sep),
 
-        // ══════ META ══════
-        kv('Sana    :', '$dateStr $timeStr'),
-        pw.SizedBox(height: 1),
-        kv('Kassir  :', cashierName ?? '—'),
-        pw.SizedBox(height: 1),
-        kv('Chek    :', rcptNo),
-        if (sale.customerName != null && sale.customerName!.isNotEmpty) ...[
-          pw.SizedBox(height: 1),
-          kv('Mijoz   :', sale.customerName!),
-        ],
-        pw.SizedBox(height: 3),
-        txt(sepEq),
-        pw.SizedBox(height: 3),
+        // ══════ CHEK MA'LUMOTLARI ══════
+        line('Sana   : $dateStr'),
+        if (cashierName != null && cashierName.isNotEmpty) line('Kassir : $cashierName'),
+        line2('Chek   : ', receiptId, bBold: true),
+        line(sep),
 
-        // ══════ USTUN SARLAVHASI ══════
-        pw.Row(
-          mainAxisSize: pw.MainAxisSize.max,
-          children: [
-            pw.Expanded(
-              child: txt('Mahsulot', bold: true, size: fs - 0.5),
-            ),
-            txt('Miqdor', bold: true, size: fs - 0.5,
-                align: pw.TextAlign.center),
-            pw.SizedBox(width: 8),
-            pw.SizedBox(
-              width: fmt.availableWidth * 0.30,
-              child: txt('Jami', bold: true, size: fs - 0.5,
-                  align: pw.TextAlign.right),
-            ),
-          ],
-        ),
-        pw.SizedBox(height: 2),
-        txt(sepDash),
+        // ══════ JADVAL SARLAVHASI ══════
+        line('Mahsulot'.padRight(_kNameW) + _center('Miqdor', _kQtyW) + 'Jami'.padLeft(_kTotalW)),
+        line(dash),
 
         // ══════ MAHSULOTLAR ══════
         ...items.asMap().entries.expand((e) {
-          final idx  = e.key + 1;
+          final idx = e.key;
           final item = e.value;
-          return [
-            pw.SizedBox(height: 4),
-
-            // Mahsulot nomi — to'liq qator, qalin
-            txt('$idx. ${item.name}', bold: true, size: fs),
-            pw.SizedBox(height: 2),
-
-            // Miqdor × narx | Jami — chap/o'ng
-            pw.Row(
-              mainAxisSize: pw.MainAxisSize.max,
-              mainAxisAlignment: pw.MainAxisAlignment.spaceBetween,
-              children: [
-                txt('${item.quantity} x ${_money(item.unitPrice)}',
-                    size: fs - 0.5),
-                txt(_money(item.total),
-                    bold: true, size: fs - 0.5),
-              ],
-            ),
-            pw.SizedBox(height: 4),
-            txt(sepDash),
+          final nm = item.name.length > _kNameW - 1
+              ? '${item.name.substring(0, _kNameW - 3)}..'
+              : item.name;
+          final totalStr = _money(item.total);
+          final rows = <pw.Widget>[
+            line(nm.padRight(_kNameW) + _center('${item.quantity}', _kQtyW) + totalStr.padLeft(_kTotalW)),
+            line(_money(item.unitPrice)),
           ];
+          if (idx < items.length - 1) rows.add(line(dotted));
+          return rows;
         }),
 
-        pw.SizedBox(height: 3),
-        txt(sepEq),
-        pw.SizedBox(height: 3),
-
         // ══════ JAMI ══════
-        kv('Jami:', _money(subtotal), size: fs),
-        if (discount > 0) ...[
-          pw.SizedBox(height: 1),
-          kv('Chegirma:', '-${_money(discount)}'),
-        ],
-        pw.SizedBox(height: 3),
-        txt(sepEq),
-        pw.SizedBox(height: 3),
+        line(sep),
+        line(_row('Jami:', _money(sale.totalAmount)), bold: true),
+        line(sep),
 
-        // ══════ TO'LOV ══════
-        kv("To'lov turi:",
-            _paymentLabels[sale.paymentMethod] ?? sale.paymentMethod,
-            bold: true, size: fs),
-        pw.SizedBox(height: 3),
-        txt(sepEq),
-        pw.SizedBox(height: 5),
+        // ══════ TO'LOV TURI ══════
+        line(_row("To'lov turi:", _paymentLabel(sale.paymentMethod))),
+        line(sep),
 
         // ══════ FOOTER ══════
-        txt('Xarid uchun rahmat!',
-            bold: true, align: pw.TextAlign.center, size: fs),
-        pw.SizedBox(height: 2),
-        txt('Qaytib kelishingizni kutib qolamiz!',
-            align: pw.TextAlign.center, size: fs - 1),
-        pw.SizedBox(height: 4),
-        txt(sepEq),
+        line('Xarid uchun rahmat!', bold: true, align: pw.TextAlign.center),
+        line('Qaytib kelishingizni kutib qolamiz!', align: pw.TextAlign.center),
+        line(sep),
+        pw.SizedBox(height: fs * 2),
       ],
     ),
   ));
