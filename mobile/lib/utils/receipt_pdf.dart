@@ -106,15 +106,6 @@ Future<Uint8List> generateReceiptPdf({
         style: pw.TextStyle(font: bold ? courierBold : courier, fontSize: size ?? fs, lineSpacing: 0),
       );
 
-  // Bir qatorda ikki xil qalinlikdagi matn (masalan "Chek   : " oddiy + "#000123" qalin)
-  pw.Widget line2(String a, String b, {bool aBold = false, bool bBold = false}) => pw.Row(
-        mainAxisSize: pw.MainAxisSize.min,
-        children: [
-          pw.Text(a, style: pw.TextStyle(font: aBold ? courierBold : courier, fontSize: fs)),
-          pw.Text(b, style: pw.TextStyle(font: bBold ? courierBold : courier, fontSize: fs)),
-        ],
-      );
-
   final sep = ''.padLeft(_kCols, '=');
   final dash = ''.padLeft(_kCols, '-');
   final dotted = (StringBuffer()..write('- ' * ((_kCols / 2).ceil()))).toString().substring(0, _kCols);
@@ -131,7 +122,8 @@ Future<Uint8List> generateReceiptPdf({
       children: [
         // ══════ SARLAVHA ══════
         line(sep),
-        line(storeName, bold: true, size: fs * 1.7, align: pw.TextAlign.center),
+        // Web'da store nomi faqat double-height (ESC 0x10), bold emas — shu sabab bold:false.
+        line(storeName, size: fs * 1.7, align: pw.TextAlign.center),
         if (storeAddress != null && storeAddress.isNotEmpty) line(storeAddress, align: pw.TextAlign.center),
         if (storePhone != null && storePhone.isNotEmpty) line(storePhone, align: pw.TextAlign.center),
         line(sep),
@@ -139,7 +131,8 @@ Future<Uint8List> generateReceiptPdf({
         // ══════ CHEK MA'LUMOTLARI ══════
         line('Sana   : $dateStr'),
         if (cashierName != null && cashierName.isNotEmpty) line('Kassir : $cashierName'),
-        line2('Chek   : ', receiptId, bBold: true),
+        // Web'da bu qator butunlay oddiy (formatlashsiz) chop etiladi.
+        line('Chek   : $receiptId'),
         line(sep),
 
         // ══════ JADVAL SARLAVHASI ══════
@@ -175,7 +168,7 @@ Future<Uint8List> generateReceiptPdf({
         line('Xarid uchun rahmat!', bold: true, align: pw.TextAlign.center),
         line('Qaytib kelishingizni kutib qolamiz!', align: pw.TextAlign.center),
         line(sep),
-        pw.SizedBox(height: fs * 2),
+        pw.SizedBox(height: 50 * PdfPageFormat.mm),
       ],
     ),
   ));

@@ -7,6 +7,7 @@ import '../../providers/auth_provider.dart';
 import '../../core/api/sales_api.dart';
 import '../../core/api/products_api.dart';
 import '../../core/api/client.dart';
+import '../../core/api/print_agent.dart';
 import '../../core/models/sale.dart';
 import '../../core/models/product.dart';
 import '../../core/theme/app_theme.dart';
@@ -101,6 +102,37 @@ class _SalesPageState extends ConsumerState<SalesPage> with SingleTickerProvider
 
   double get _total => _cart.fold(0, (s, c) => s + c.total);
 
+  Future<void> _openPrinterSettings(BuildContext context) async {
+    final current = await getPrintAgentAddress() ?? '';
+    if (!context.mounted) return;
+    final ctrl = TextEditingController(text: current);
+    final saved = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Printer server manzili'),
+        content: TextField(
+          controller: ctrl,
+          keyboardType: TextInputType.url,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '192.168.1.50:5555',
+            helperText: "Print-agent ishlayotgan kompyuterning IP:port manzili",
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Bekor qilish')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Saqlash')),
+        ],
+      ),
+    );
+    if (saved == true) {
+      await savePrintAgentAddress(ctrl.text);
+      if (context.mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Printer manzili saqlandi')));
+      }
+    }
+  }
+
   Future<void> _checkout() async {
     if (_cart.isEmpty || _processing) return;
     setState(() => _processing = true);
@@ -141,6 +173,13 @@ class _SalesPageState extends ConsumerState<SalesPage> with SingleTickerProvider
       backgroundColor: AppColors.bg,
       appBar: AppBar(
         title: const Text('Sotuv'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.print_outlined),
+            tooltip: 'Printer sozlamalari',
+            onPressed: () => _openPrinterSettings(context),
+          ),
+        ],
         bottom: TabBar(
           controller: _tabs,
           labelColor: AppColors.primary,
@@ -471,7 +510,9 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
     }
   }
 
-  Future<void> _print() async {
+  // Zaxira yo'l: OS print-dialog orqali PDF chop etish (agent ishlamasa yoki
+  // printer/kabel ulanmagan bo'lsa ham cashier chekdan mahrum qolmasligi uchun).
+  Future<void> _printPdf() async {
     setState(() => _loading = true);
     try {
       final user = ref.read(authProvider).user;
@@ -490,6 +531,42 @@ class _ReceiptSheetState extends ConsumerState<_ReceiptSheet> {
     } finally {
       if (mounted) setState(() => _loading = false);
     }
+  }
+
+  // Asosiy yo'l: web bilan bir xil print-agent'ga to'g'ridan-to'g'ri ulanib,
+  // xuddi shu buildReceipt() orqali chek chiqaradi (baytma-bayt bir xil natija).
+  // Kabel uzilgan/agent ishlamasa — aniq xato ko'rsatiladi va PDF zaxiraga taklif qilinadi.
+  Future<void> _print() async {
+    if (_loading) return;
+    setState(() => _loading = true);
+    PrintAgentResult result;
+    try {
+      final user = ref.read(authProvider).user;
+      result = await printViaAgent(
+        sale: widget.sale,
+        items: widget.items,
+        storeName: user?.store?.name ?? 'MY SANTEX',
+        storeAddress: user?.store?.address,
+        storePhone: user?.store?.phone,
+        cashierName: user?.name,
+      );
+    } finally {
+      if (mounted) setState(() => _loading = false);
+    }
+    if (!mounted || result.ok) return;
+
+    final usePdf = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Printerga chiqmadi'),
+        content: Text(result.error ?? "Noma'lum xato"),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Bekor qilish')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('PDF orqali chop etish')),
+        ],
+      ),
+    );
+    if (usePdf == true) await _printPdf();
   }
 
   @override

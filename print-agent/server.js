@@ -12,6 +12,11 @@
  *   GET  /status   -> joriy rejim va transport zanjiri
  *   POST /print    -> sotuv JSON -> chek chiqaradi
  *   POST /cut      -> faqat qog'ozni kesadi
+ *
+ * HOST 0.0.0.0 (standart) — bir xil Wi-Fi/LAN'dagi mobil ilova ham shu agentga
+ * to'g'ridan-to'g'ri ulanib, xuddi shu buildReceipt() orqali chek chiqara oladi
+ * (baytma-bayt web bilan bir xil natija). Faqat shu kompyuterda qolishi kerak
+ * bo'lsa: HOST=127.0.0.1 node server.js
  */
 
 'use strict';
@@ -24,7 +29,7 @@ const path = require('path');
 const { execFile } = require('child_process');
 
 // ---------- Sozlamalar (ENV) ----------
-const HOST = process.env.HOST || '127.0.0.1';
+const HOST = process.env.HOST || '0.0.0.0';
 const PORT = parseInt(process.env.PORT || '5555', 10);
 
 const PRINTER_IP = (process.env.PRINTER_IP || '').trim();
@@ -175,7 +180,9 @@ function buildReceipt(sale) {
   ln("Qaytib kelishingizni kutib qolamiz!");
   ln(SEP);
   cmd(ESC, 0x61, 0);
-  cmd(LF, LF, LF);
+  // ESC J n — n x 0.125mm, bayt max 255 (31.875mm) shu sabab 2 marta: 255+145=400 => 50mm (5sm)
+  cmd(ESC, 0x4a, 255);
+  cmd(ESC, 0x4a, 145);
   cmd(GS, 0x56, 0x41, 0x00);
   return Buffer.concat(out);
 }
@@ -391,14 +398,17 @@ const server = http.createServer((req, res) => {
 
   if (req.method === 'POST' && url === '/print') {
     let body = '';
+    console.log(`[print] so'rov keldi <- ${req.socket.remoteAddress} @ ${new Date().toISOString()}`);
     req.on('data', (c) => { body += c; if (body.length > 2e6) req.destroy(); });
     req.on('end', () => {
       let sale;
       try { sale = JSON.parse(body || '{}'); }
       catch (_) { return send(res, 400, { ok: false, error: 'JSON xato' }); }
+      console.log(`[print] chek #${sale.receiptNo} | ${(sale.items || []).length} ta mahsulot | body ${body.length} bayt`);
       let buf;
       try { buf = buildReceipt(sale); }
       catch (e) { return send(res, 400, { ok: false, error: 'Chek qurishda xato: ' + e.message }); }
+      console.log(`[print] bufer uzunligi: ${buf.length} bayt`);
       printBuffer(buf)
         .then((r) => send(res, 200, Object.assign({ ok: true }, r)))
         .catch((e) => send(res, 500, { ok: false, error: e.message }));
@@ -432,6 +442,17 @@ const server = http.createServer((req, res) => {
   send(res, 404, { ok: false, error: 'Not found' });
 });
 
+function lanAddresses() {
+  const nets = os.networkInterfaces();
+  const out = [];
+  for (const name of Object.keys(nets)) {
+    for (const net of nets[name] || []) {
+      if (net.family === 'IPv4' && !net.internal) out.push(net.address);
+    }
+  }
+  return out;
+}
+
 server.listen(PORT, HOST, () => {
   const s = statusInfo();
   console.log('--------------------------------------------------');
@@ -441,5 +462,12 @@ server.listen(PORT, HOST, () => {
   if (s.printerIp) console.log(` Network  : ${s.printerIp}:${s.printerPort}`);
   if (s.platform === 'win32' || s.platform === 'darwin') console.log(` Printer  : ${s.printerName}`);
   if (s.platform !== 'win32' && s.platform !== 'darwin') console.log(` USB      : ${s.usbPath}`);
+  if (HOST === '0.0.0.0') {
+    const lan = lanAddresses();
+    if (lan.length) {
+      console.log(` Mobil ilova sozlamasiga shu manzil(lar)ni kiriting:`);
+      lan.forEach((ip) => console.log(`   -> ${ip}:${PORT}`));
+    }
+  }
   console.log('--------------------------------------------------');
 });
