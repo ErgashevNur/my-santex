@@ -149,6 +149,14 @@ const CSS = `
   .land-actions { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
   .land-primary { padding: 14px 28px; font-size: 1rem; animation: landCtaPulse 2.6s ease-in-out infinite; }
   .land-secondary { padding: 14px 24px; font-size: 1rem; }
+  .land-telegram-btn {
+    background: #229ed9;
+    box-shadow: 0 8px 24px rgba(34,158,217,0.3);
+  }
+  .land-telegram-btn:hover { filter: brightness(1.08); }
+  .land-hint {
+    font-size: 0.85rem; color: #94a3b8; margin: 10px 0 0;
+  }
 
   @media (max-width: 880px) {
     .land-hero { flex-direction: column-reverse; text-align: center; padding-top: 8px; gap: 12px; }
@@ -217,7 +225,20 @@ export default function LandingPage() {
               >
                 Tizimga kirish →
               </button>
+              <a
+                className="land-cta-btn land-secondary land-telegram-btn"
+                href="https://t.me/CodeNur"
+                target="_blank"
+                rel="noopener noreferrer"
+                style={{ display: 'inline-flex', alignItems: 'center', gap: 8, textDecoration: 'none' }}
+              >
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+                  <path d="M21.5 3.5L2.75 10.9c-1.05.42-1.04 1-.18 1.27l4.78 1.49 1.85 5.6c.22.56.44.79.86.79.42 0 .6-.19.83-.42l1.99-1.92 4.14 3.06c.76.42 1.31.2 1.5-.7l2.72-12.8c.28-1.15-.28-1.63-1.24-1.27z" fill="white"/>
+                </svg>
+                Ro'yxatdan o'tish
+              </a>
             </div>
+            <p className="land-hint">Ro'yxatdan o'tish uchun admin bilan Telegram orqali bog'laning</p>
           </div>
 
           <div className="land-anim">
